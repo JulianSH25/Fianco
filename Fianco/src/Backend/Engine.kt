@@ -9,51 +9,87 @@ import java.lang.IndexOutOfBoundsException
 //import java.util.List;
 import kotlin.collections.List
 import kotlin.collections.mutableMapOf
+import kotlin.compareTo
 
 class Engine {
-    fun alphaBeta(successors: Pair<Long, Array<Long>>, depth: Int, alpha: Int, beta: Int): Int{
+    var nodesExplored = 0
+    fun alphaBeta(
+        board: Array<Array<Int>>,
+        depth: Int,
+        alpha: Int,
+        beta: Int,
+        maximizingPlayer: Boolean
+    ): Int {
+        nodesExplored++  // Increment the node counter
         var alpha = alpha
         var beta = beta
-        if (checkTerminal(successors.first) || depth == 0){
-            // successors.first is the current node (i.e. root of the subtree)
-            return evaluate(successors)
+
+        if (checkTerminal(board) || depth == 0) {
+            return evaluate(board)
         }
-        var score = Int.MIN_VALUE
 
-        for (succ in successors.second){
-            // successors.second is an array of all the actual successor positions of the current node/root, obtained from @generateMoves
-            val value = -alphaBeta(Pair(succ, successors(succ)), depth-1, -beta, -alpha)
-
-            if (value > score){
-                score = value
+        if (maximizingPlayer) {
+            var maxEval = Int.MIN_VALUE
+            for (child in successors(board, 2)) { // AI is player 2 (black)
+                val eval = alphaBeta(child, depth - 1, alpha, beta, false)
+                maxEval = maxOf(maxEval, eval)
+                alpha = maxOf(alpha, eval)
+                if (beta <= alpha) {
+                    break
+                }
             }
-
-            if (score > alpha){
-                alpha = score
+            return maxEval
+        } else {
+            var minEval = Int.MAX_VALUE
+            for (child in successors(board, 1)) { // Human is player 1 (white)
+                val eval = alphaBeta(child, depth - 1, alpha, beta, true)
+                minEval = minOf(minEval, eval)
+                beta = minOf(beta, eval)
+                if (beta <= alpha) {
+                    break
+                }
             }
-            else if (score >= beta){
-                beta = score
+            return minEval
+        }
+    }
+
+    private fun checkTerminal(board: Array<Array<Int>>): Boolean {
+        return checkVictory(board) != null
+    }
+
+    private fun evaluate(board: Array<Array<Int>>): Int {
+        var aiPieces = 0
+        var humanPieces = 0
+
+        for (row in board) {
+            for (cell in row) {
+                when (cell) {
+                    1 -> humanPieces++  // Assuming 1 represents human (white)
+                    2 -> aiPieces++     // Assuming 2 represents AI (black)
+                }
             }
         }
-        return score
+
+        // Simple evaluation: difference in the number of pieces
+        return aiPieces - humanPieces
     }
 
-    private fun checkTerminal(node: Long): Boolean{
-        return checkVictory() != null
-        TODO("Make less general")
+    private fun successors(board: Array<Array<Int>>, playerID: Int): List<Array<Array<Int>>> {
+        val positions = createPiecePositionsFromBoard(board)
+        val moves = generateMoves(playerID, board, positions)
+        val successorsList = mutableListOf<Array<Array<Int>>>()
+
+        for ((fromPosition, toPositions) in moves.first) {
+            for (toPosition in toPositions) {
+                val newBoard = copyBoard(board)
+                makeMove(newBoard, fromPosition, toPosition, moves.second == "Capture")
+                successorsList.add(newBoard)
+            }
+        }
+        return successorsList
     }
 
-    fun evaluate(successors: Pair<Long, Array<Long>>): Int{
-
-        return TODO("Provide the return value")
-    }
-
-    fun successors(rootNode: Long): Array<Long>{
-        //succ_array = generateMoves()
-        return TODO("Provide the return value")
-    }
-
-    fun addMoveToArray(pieceArray: Array<Array<Int>>, newMove: Pair<Point, Point>): Array<Array<Int>>{
+    private fun addMoveToArray(pieceArray: Array<Array<Int>>, newMove: Pair<Point, Point>): Array<Array<Int>>{
         TODO("Make deep copy?")
         pieceArray[newMove.second.x][newMove.second.y] = pieceArray[newMove.first.x][newMove.first.y]
         pieceArray[newMove.first.x][newMove.first.y] = 0
@@ -75,8 +111,8 @@ fun generateMoves(
 
     val validMoves = checkCapture(piecePositions, colour, true, pieceArray)
     if (validMoves != null) {
-        println("Move: CAPTURE")
-        printPositionMap(validMoves)
+        //println("Move: CAPTURE")
+        //printPositionMap(validMoves)
         return Pair(validMoves, "Capture")
     }
 
@@ -101,8 +137,8 @@ fun generateMoves(
             }
         }
     }
-    println("Move: REGULAR")
-    printPositionMap(positionMap)
+    //println("Move: REGULAR")
+    //printPositionMap(positionMap)
     return if (positionMap.isNotEmpty()) Pair(positionMap, "Regular") else throw NullPointerException("No valid moves")
 }
 
@@ -125,5 +161,26 @@ fun printPositionMap(positionMap: Map<Point, List<Point>>) {
         for (move in moves) {
             println("  - $move")
         }
+    }
+}
+
+fun copyBoard(board: Array<Array<Int>>): Array<Array<Int>> {
+    return board.map { it.copyOf() }.toTypedArray()
+}
+
+fun makeMove(
+    board: Array<Array<Int>>,
+    from: Point,
+    to: Point,
+    isCapture: Boolean
+) {
+    val piece = board[from.x][from.y]
+    board[to.x][to.y] = piece
+    board[from.x][from.y] = 0
+
+    if (isCapture) {
+        val captureX = (from.x + to.x) / 2
+        val captureY = (from.y + to.y) / 2
+        board[captureX][captureY] = 0
     }
 }

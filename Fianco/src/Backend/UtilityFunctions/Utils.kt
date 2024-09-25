@@ -76,7 +76,7 @@ fun checkCapture(
                         val currentPosition = Point(x, y)
                         val capturePoints = captureMap.getOrPut(currentPosition) { mutableListOf() }
                         capturePoints.add(if (AIMove == true) Point(newX2, newY2) else Point(newX, newY))
-                        println("found capture move: $currentPosition via $newX, $newY, to $newX2, $newY2")
+                        //println("found capture move: $currentPosition via $newX, $newY, to $newX2, $newY2")
                     }
                 }
             }
@@ -105,11 +105,11 @@ fun isValidMove(currentPosition: Point, newPosition: Point, piecePositions: Map<
         // If not occupied, it's a normal move (one straight or one to the side)
         val dx = abs(newPosition.x - currentPosition.x)
         val dy = abs(newPosition.y - currentPosition.y)
-        println("dx: $dx, dy: $dy")
+        //println("dx: $dx, dy: $dy")
 
         if (piecePositions[currentPosition] != currentPlayer) return Pair(false, null)
         if (piecePositions.containsKey(newPosition)){
-            print("Position blocked: $newPosition with value ${piecePositions[newPosition]}")
+            //print("Position blocked: $newPosition with value ${piecePositions[newPosition]}")
             return Pair(false, null)
         }
 
@@ -137,13 +137,13 @@ fun checkValidMove(
 
     // 2. Check if the new position is occupied.
     if (piecePositions.containsKey(newPosition)) {
-        println("Position blocked: $newPosition with value ${piecePositions[newPosition]}")
+        //println("Position blocked: $newPosition with value ${piecePositions[newPosition]}")
         return false
     }
 
     val dx = abs(newPosition.x - currentPosition.x)
     val dy = abs(newPosition.y - currentPosition.y)
-    println("dx: $dx, dy: $dy")
+    //println("dx: $dx, dy: $dy")
 
     if (piecePositions[currentPosition] != currentPlayer) return false
 

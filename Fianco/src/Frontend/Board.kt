@@ -11,6 +11,8 @@ import Frontend.PieceManager.capturePiece
 
 import Backend.Engine.*
 
+import javax.swing.SwingWorker
+import javax.swing.SwingUtilities
 import java.awt.*
 import java.awt.event.*
 import java.awt.image.BufferedImage
@@ -33,6 +35,7 @@ class Board : JComponent() {
     private var currentPlayer = Color.WHITE
 
     private val messageLabel = JLabel()
+    private val infoLabel = JLabel()
     private val redPawnImage: BufferedImage? = ImageIO.read(javaClass.getResource("figures/whitePawn.png"))
     private val blackPawnImage: BufferedImage? = ImageIO.read(javaClass.getResource("figures/blackPawn.png"))
     //val pieceArray = Array(9) { Array(9) { 0 } }
@@ -41,6 +44,12 @@ class Board : JComponent() {
 
 
     init {
+        infoLabel.font = infoLabel.font.deriveFont(Font.PLAIN, 14f)
+        infoLabel.border = LineBorder(Color.BLACK)
+        infoLabel.horizontalAlignment = JLabel.CENTER
+        infoLabel.isOpaque = true
+        add(infoLabel, BorderLayout.NORTH)
+
         messageLabel.font = messageLabel.font.deriveFont(Font.BOLD)
         messageLabel.border = LineBorder(Color.BLACK)
         messageLabel.horizontalAlignment = JLabel.CENTER
@@ -72,10 +81,10 @@ class Board : JComponent() {
                     // Log for debugging
                     println("Attempting to move piece from $selectedPiece to $newPosition")
 
-                    // Handle the move and potentially trigger AI move
+                    // Handle the move and potentially trigger AI move asynchronously
                     if (handleMove(selectedPiece!!, newPosition) && initialiseAI) {
                         selectedPiece = null
-                        randomAI()
+                        aiMove()  // Changed from aiMove() to aiMoveAsync()
                     } else {
                         selectedPiece = null
                     }
@@ -88,6 +97,38 @@ class Board : JComponent() {
                 repaint()
             }
         })
+    }
+
+    fun aiMove() {
+        val aiWorker = object : SwingWorker<Unit, Unit>() {
+            var nodesExplored = 0
+
+            override fun doInBackground() {
+                val depth = 8  // Adjust the search depth as needed
+                val boardCopy = PieceManager.getBoardCopy()
+                val positionsCopy = createPiecePositionsFromBoard(boardCopy)
+                val bestMove = getBestMove(boardCopy, positionsCopy, depth)
+                //nodesExplored = nodeCount
+                if (bestMove != null) {
+                    // Update the game state on the Event Dispatch Thread (EDT)
+                    SwingUtilities.invokeLater {
+                        handleMoveAI(bestMove.first, bestMove.second, bestMove.third)
+                        repaint()
+                        checkForWinner()
+                    }
+                } else {
+                    println("AI has no valid moves!")
+                }
+            }
+
+            override fun done() {
+                // Optionally update GUI components after AI move is completed
+                SwingUtilities.invokeLater {
+                    infoLabel.text = "Nodes explored: $nodesExplored | Depth: 3"
+                }
+            }
+        }
+        aiWorker.execute()
     }
 
     fun randomAI(){
@@ -133,6 +174,46 @@ class Board : JComponent() {
             setPiece(8 - i, 8 - i, 1)
         }
     }
+
+    fun aiMoveOLD() {
+        val depth = 8  // Adjust as needed
+        val boardCopy = getBoardCopy()
+        val positionsCopy = createPiecePositionsFromBoard(boardCopy)
+        val bestMove = getBestMove(boardCopy, positionsCopy, depth)
+        if (bestMove != null) {
+            handleMoveAI(bestMove.first, bestMove.second, bestMove.third)
+        } else {
+            println("AI has no valid moves!")
+        }
+    }
+
+    fun getBestMove(
+        board: Array<Array<Int>>,
+        positions: Map<Point, Color>,
+        depth: Int
+    ): Triple<Point, Point, Map<Point, List<Point>>?>? {
+        val engine = Engine()
+        engine.nodesExplored = 0
+
+        var bestValue = Int.MIN_VALUE
+        var bestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
+
+        val moves = generateMoves(2, board, positions)  // AI is player 2 (black)
+        for ((fromPosition, toPositions) in moves.first) {
+            for (toPosition in toPositions) {
+                val newBoard = copyBoard(board)
+                makeMove(newBoard, fromPosition, toPosition, moves.second == "Capture")
+                val boardValue = engine.alphaBeta(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, false)
+                if (boardValue > bestValue) {
+                    bestValue = boardValue
+                    bestMove = Triple(fromPosition, toPosition, if (moves.second == "Capture") moves.first else null)
+                }
+            }
+        }
+        println("EXPLORED NODES IN LAST ITERATION: ${engine.nodesExplored}")
+        return bestMove
+    }
+
     fun handleMoveAI(oldPosition: Point, newPosition: Point, captureMap: Map<Point, List<Point>>? = null) {
 
         if (captureMap != null) {
@@ -266,39 +347,6 @@ class Board : JComponent() {
     override fun getPreferredSize(): Dimension {
         return Dimension(9 * Constants.SQUARE_SIZE, 9 * Constants.SQUARE_SIZE)
     }
-
-    /*private fun restartGame() {
-        // Clear all piece positions
-        piecePositions.clear()
-
-        // Reset the pieceArray
-        for (i in 0 until 9) {
-            pieceArray[i][0] = 1
-            piecePositions[Point(i, 0)] = Color.WHITE
-            pieceArray[i][8] = 2
-            piecePositions[Point(i, 8)] = Color.BLACK
-        }
-
-        // Reset additional pieces based on your original setup
-        for (i in 1 until 4) {
-            piecePositions[Point(i, i)] = Color.WHITE
-            pieceArray[i][i] = 1
-            piecePositions[Point(8 - i, i)] = Color.WHITE
-            pieceArray[8 - i][i] = 1
-
-            piecePositions[Point(i, 8 - i)] = Color.BLACK
-            pieceArray[i][8 - i] = 2
-            piecePositions[Point(8 - i, 8 - i)] = Color.BLACK
-            pieceArray[8 - i][8 - i] = 2
-        }
-
-        // Reset the current player
-        currentPlayer = Color.WHITE
-
-        // Clear any global captures
-        globalCaptureMap.clear()
-
-        // Repaint the board to reflect the reset
-        repaint()
-    }*/
 }
+
+private fun Engine.copyBoard(arrays: Array<Array<Int>>) {}

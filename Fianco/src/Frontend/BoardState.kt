@@ -18,7 +18,7 @@ object PieceManager {
         if (value == 0) piecePositions.remove(Point(row,column)) else
             piecePositions[Point(row,column)] = if (value == 1) Color.WHITE else Color.BLACK
 
-        printBoard() // Print the board for debugging
+        //printBoard() // Print the board for debugging
     }
 
     fun movePiece(oldPosition: Point, newPosition: Point) {
@@ -35,7 +35,7 @@ object PieceManager {
 
         setPiece(oldPosition.x + dx, oldPosition.y + dy, 0)
 
-        print("Old Position: $oldPosition, Captured Position: ${oldPosition.x + dx}, ${oldPosition.y + dy}, New Position: $newPosition")
+        //print("Old Position: $oldPosition, Captured Position: ${oldPosition.x + dx}, ${oldPosition.y + dy}, New Position: $newPosition")
     }
 
     // Get a copy of the current board
@@ -45,7 +45,7 @@ object PieceManager {
 
     // Optional: Add a function to print the board in a readable format
     private fun printBoard() {
-        println("Current Board:")
+        //println("Current Board:")
         for (row in pieceArray) {
             for (cell in row) {
                 print("$cell ")
@@ -55,3 +55,4 @@ object PieceManager {
         println()
     }
 }
+
