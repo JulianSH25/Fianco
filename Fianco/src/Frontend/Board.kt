@@ -148,33 +148,7 @@ class Board : JComponent() {
 
         checkForWinner()
     }
-    fun handleMoveAIOLD(oldPosition: Point, newPosition: Point, captureMap: Map<Point, List<Point>>? = null) {
-        val dx = if (captureMap != null) newPosition.x - oldPosition.x else 0
-        val dy = if (captureMap != null) newPosition.y - oldPosition.y else 0
 
-        movePiece(oldPosition, newPosition)
-
-        // Handle captures
-        captureMap?.get(oldPosition)?.let { capturedPieces ->
-            val dx = newPosition.x - oldPosition.x
-            val dy = newPosition.y - oldPosition.y
-            val capturedX = oldPosition.x + dx / 2
-            val capturedY = oldPosition.y + dy / 2
-
-            capturedPieces.find { it.x == capturedX && it.y == capturedY }?.let { capturedPiece ->
-                piecePositions.remove(capturedPiece)
-                setPiece(capturedPiece.x, capturedPiece.y, 0)
-                repaint()
-            }
-            print("Moved from $oldPosition to ${newPosition.x + dx}, ${newPosition.y} and removed piece at $capturedX, $capturedY")
-        }
-
-        // Switch player
-        currentPlayer = if (currentPlayer == Color.WHITE) Color.BLACK else Color.WHITE
-        repaint()
-
-        checkForWinner()
-    }
     fun handleMove(oldPosition: Point, newPosition: Point): Boolean {
         val (validMove, captureMap) = isValidMove(oldPosition, newPosition, piecePositions, currentPlayer)
 

@@ -64,56 +64,59 @@ class Engine {
 
 }
 
-fun generateMoves(playerID: Int, pieceArray: Array<Array<Int>>, positions: MutableMap<Point, Color>? = null): Pair<Map<Point, List<Point>>, String> {
+fun generateMoves(
+    playerID: Int,
+    pieceArray: Array<Array<Int>>,
+    positions: Map<Point, Color>? = null
+): Pair<Map<Point, List<Point>>, String> {
 
-    val piecePositions = if (positions != null) positions else piecePositions
-    //val pieceArrayCopy = getBoardCopy()
+    val piecePositions = positions ?: createPiecePositionsFromBoard(pieceArray)
     val colour = if (playerID == 1) Color.WHITE else Color.BLACK
-    // map the received player ID (CURRENT PLAYER TO MOVE) to the respective colour (white/black)
 
-    val validMoves = checkCapture(piecePositions, colour, true) // call checkCapture to understand whether the next move will be a capture move or a regular one
-
-    if (validMoves != null){ //check if pieces can be captured, if so the resulting moves are the only valid ones
+    val validMoves = checkCapture(piecePositions, colour, true, pieceArray)
+    if (validMoves != null) {
         println("Move: CAPTURE")
         printPositionMap(validMoves)
         return Pair(validMoves, "Capture")
     }
 
-    val i = if (playerID == 1) -1 else if (playerID == 2) 1 else throw IndexOutOfBoundsException()
-    // set up a multiplicator which is used to decide on the right direction to move, in order to generate the correct moves
+    val i = if (playerID == 1) -1 else 1
+    val positionMap = mutableMapOf<Point, List<Point>>()
 
+    for ((position, pieceColor) in piecePositions) {
+        if (pieceColor == colour) {
+            val x = position.x
+            val y = position.y
 
-    if (playerID == 1 || playerID == 2){
-        val positionMap = mutableMapOf<Point, List<Point>>()
-        for (piece in piecePositions){
-            if (piece.value == colour){
-                val x = piece.key.x
-                val y = piece.key.y
-
-                val positionList = arrayOf(Point(x, y - 1), Point(x + (i * 1), y), Point(x, y + 1))
-                var returnPositionList = mutableListOf<Point>()
-
-                for (position in positionList){
-                    if (checkValidMove(Point(x, y), position, piecePositions, colour)){
-                        returnPositionList.add(position)
-                    }
-                    else{
-                        //throw Exception("Invalid move position. CHECK IMPLEMENTATION" + piece.key + " " + position)
-                        //returnPositionList.add(position)
-                    }
-                }
-                if (returnPositionList.isNotEmpty()) {
-                    positionMap[Point(x, y)] = returnPositionList
-                    returnPositionList = mutableListOf()
-                }
+            val potentialMoves = arrayOf(
+                Point(x + (i * 1), y),  // Forward
+                Point(x, y - 1),        // Left
+                Point(x, y + 1)         // Right
+            )
+            val validPositions = potentialMoves.filter {
+                checkValidMove(position, it, piecePositions, colour)
             }
-            //var positionList = mutableListOf<Point>()
+            if (validPositions.isNotEmpty()) {
+                positionMap[position] = validPositions
+            }
         }
-        println("Move: REGULAR")
-        printPositionMap(positionMap)
-        return if (positionMap.isNotEmpty()) Pair(positionMap, "Regular") else throw NullPointerException("Empty position array; Engine.kt")
     }
-    throw IndexOutOfBoundsException("Index out of bounds")
+    println("Move: REGULAR")
+    printPositionMap(positionMap)
+    return if (positionMap.isNotEmpty()) Pair(positionMap, "Regular") else throw NullPointerException("No valid moves")
+}
+
+fun createPiecePositionsFromBoard(pieceArray: Array<Array<Int>>): MutableMap<Point, Color> {
+    val positions = mutableMapOf<Point, Color>()
+    for (i in pieceArray.indices) {
+        for (j in pieceArray[i].indices) {
+            val value = pieceArray[i][j]
+            if (value != 0) {
+                positions[Point(i, j)] = if (value == 1) Color.WHITE else Color.BLACK
+            }
+        }
+    }
+    return positions
 }
 
 fun printPositionMap(positionMap: Map<Point, List<Point>>) {

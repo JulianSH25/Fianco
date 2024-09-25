@@ -1,6 +1,8 @@
 package Backend.UtilityFunctions
 
 import Frontend.PieceManager.getPiece
+import Frontend.PieceManager
+import Frontend.PieceManager.getBoardCopy
 import java.awt.Color
 import java.awt.Point
 import kotlin.collections.component1
@@ -31,7 +33,24 @@ fun checkVictory(): Color? {
     return null // No winner yet
 }
 
-fun checkCapture(piecePositions: Map<Point, Color>, currentPlayer: Color, AIMove: Boolean? = false): Map<Point, List<Point>>? {
+fun checkVictory(pieceArray: Array<Array<Int>> = getBoardCopy()): Color? {
+    for (i in 0 until 9) {
+        if (pieceArray[8][i] == 2) { // Black piece reached the bottom
+            return Color.BLACK
+        }
+        if (pieceArray[0][i] == 1) { // White piece reached the top
+            return Color.WHITE
+        }
+    }
+    return null // No winner yet
+}
+
+fun checkCapture(
+    piecePositions: Map<Point, Color> = PieceManager.piecePositions,
+    currentPlayer: Color,
+    AIMove: Boolean? = false,
+    pieceArray: Array<Array<Int>> = getBoardCopy()
+): Map<Point, List<Point>>? {
 
     val opponentColour = if (currentPlayer == Color.WHITE) 2 else 1
     val multiplier = if (currentPlayer == Color.WHITE) -1 else 1
@@ -42,7 +61,7 @@ fun checkCapture(piecePositions: Map<Point, Color>, currentPlayer: Color, AIMove
             val x = point.x
             val y = point.y
 
-            val directions = listOf(-1, 1)  // Correct way to create a list of integers
+            val directions = listOf(-1, 1)
 
             for (i in directions) {
                 val newX = x + multiplier
@@ -52,24 +71,18 @@ fun checkCapture(piecePositions: Map<Point, Color>, currentPlayer: Color, AIMove
 
                 if (newX in 1 until 8 && newY in 1 until 8 &&
                     newX2 in 0 until 9 && newY2 in 0 until 9
-                ) { // Bounds check
-
-                    if (getPiece(newX, newY) == opponentColour && getPiece(newX2, newY2) == 0) {
+                ) {
+                    if (pieceArray[newX][newY] == opponentColour && pieceArray[newX2][newY2] == 0) {
                         val currentPosition = Point(x, y)
                         val capturePoints = captureMap.getOrPut(currentPosition) { mutableListOf() }
                         capturePoints.add(if (AIMove == true) Point(newX2, newY2) else Point(newX, newY))
-                        println("found capture move: $currentPosition via $newX, $newY,  to $newX2, $newY2")
+                        println("found capture move: $currentPosition via $newX, $newY, to $newX2, $newY2")
                     }
                 }
             }
         }
     }
-    if (captureMap.isNotEmpty()) {
-        //println(captureMap)
-        //globalCaptureMap = captureMap
-        return captureMap
-    }
-    return null
+    return if (captureMap.isNotEmpty()) captureMap else null
 }
 
 fun isValidMove(currentPosition: Point, newPosition: Point, piecePositions: Map<Point, Color>, currentPlayer: Color): Pair<Boolean, Map<Point, List<Point>>?> {
@@ -113,31 +126,33 @@ fun isValidMove(currentPosition: Point, newPosition: Point, piecePositions: Map<
     return Pair(true, null)
 }
 
-fun checkValidMove(currentPosition: Point, newPosition: Point, piecePositions: Map<Point, Color>, currentPlayer: Color): Boolean {
+fun checkValidMove(
+    currentPosition: Point,
+    newPosition: Point,
+    piecePositions: Map<Point, Color>,
+    currentPlayer: Color,
+): Boolean {
     // 1. Check if the new position is within the board bounds.
     if (newPosition.x !in 0..8 || newPosition.y !in 0..8) return false
 
     // 2. Check if the new position is occupied.
-        // If not occupied, it's a normal move (one straight or one to the side)
+    if (piecePositions.containsKey(newPosition)) {
+        println("Position blocked: $newPosition with value ${piecePositions[newPosition]}")
+        return false
+    }
+
     val dx = abs(newPosition.x - currentPosition.x)
     val dy = abs(newPosition.y - currentPosition.y)
     println("dx: $dx, dy: $dy")
 
     if (piecePositions[currentPosition] != currentPlayer) return false
-    if (piecePositions.containsKey(newPosition)){
-        print("Position blocked: $newPosition with value ${piecePositions[newPosition]}")
-        return false
-    }
 
-    // check whether a move of manhattan distance greater 1 or no move has been made (Distance 0)
+    // Check whether a move of Manhattan distance greater than 1 or no move has been made (distance 0)
     if (dx + dy != 1) return false
 
-    // Check for backward movement (assuming RED moves "up" the board and BLACK moves "down")
-    if (currentPlayer == Color.WHITE && newPosition.y < currentPosition.y) return false
-    if (currentPlayer == Color.BLACK && newPosition.y > currentPosition.y) return false
-
-
-    // 4. (Optional) Add more complex rules here (special moves, etc.)
+    // Check for backward movement
+    if (currentPlayer == Color.BLACK && newPosition.x < currentPosition.x) return false
+    if (currentPlayer == Color.WHITE && newPosition.x > currentPosition.x) return false
 
     return true
 }
