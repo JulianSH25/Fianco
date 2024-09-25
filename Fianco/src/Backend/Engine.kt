@@ -8,6 +8,7 @@ import java.awt.Point
 import java.lang.IndexOutOfBoundsException
 //import java.util.List;
 import kotlin.collections.List
+import kotlin.collections.mutableMapOf
 
 class Engine {
     fun alphaBeta(successors: Pair<Long, Array<Long>>, depth: Int, alpha: Int, beta: Int): Int{
@@ -63,7 +64,9 @@ class Engine {
 
 }
 
-fun generateMoves(playerID: Int, pieceArray: Array<Array<Int>>, newMove: Pair<Point, Point>? = null): Pair<Map<Point, List<Point>>, String> {
+fun generateMoves(playerID: Int, pieceArray: Array<Array<Int>>, positions: MutableMap<Point, Color>? = null): Pair<Map<Point, List<Point>>, String> {
+
+    val piecePositions = if (positions != null) positions else piecePositions
     //val pieceArrayCopy = getBoardCopy()
     val colour = if (playerID == 1) Color.WHITE else Color.BLACK
     // map the received player ID (CURRENT PLAYER TO MOVE) to the respective colour (white/black)
