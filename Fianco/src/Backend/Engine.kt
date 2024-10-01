@@ -13,44 +13,32 @@ import kotlin.compareTo
 
 class Engine {
     var nodesExplored = 0
-    fun alphaBeta(
-        board: Array<Array<Int>>,
-        depth: Int,
-        alpha: Int,
-        beta: Int,
-        maximizingPlayer: Boolean
-    ): Int {
-        nodesExplored++  // Increment the node counter
+
+    fun alphaBeta(board: Array<Array<Int>>,
+                  depth: Int,
+                  alpha: Int,
+                  beta: Int,
+                  player: Int): Int {
+        
+        if (checkTerminal(board)) {
+            return if(checkVictory(board) == Color.BLACK && player == 2) Int.MAX_VALUE else Int.MIN_VALUE
+        }
+        else if (depth == 0){
+            return player * evaluate(board)
+        }
+
+        nodesExplored++
         var alpha = alpha
-        var beta = beta
-
-        if (checkTerminal(board) || depth == 0) {
-            return evaluate(board)
-        }
-
-        if (maximizingPlayer) {
-            var maxEval = Int.MIN_VALUE
-            for (child in successors(board, 2)) { // AI is player 2 (black)
-                val eval = alphaBeta(child, depth - 1, alpha, beta, false)
-                maxEval = maxOf(maxEval, eval)
-                alpha = maxOf(alpha, eval)
-                if (beta <= alpha) {
-                    break
-                }
+        var score = Int.MIN_VALUE
+        for (child in successors(board, player)) {
+            val eval = -alphaBeta(child, depth - 1, -beta, -alpha, -player)
+            score = maxOf(score, eval)
+            alpha = maxOf(alpha, eval)
+            if (score >= beta) {
+                break
             }
-            return maxEval
-        } else {
-            var minEval = Int.MAX_VALUE
-            for (child in successors(board, 1)) { // Human is player 1 (white)
-                val eval = alphaBeta(child, depth - 1, alpha, beta, true)
-                minEval = minOf(minEval, eval)
-                beta = minOf(beta, eval)
-                if (beta <= alpha) {
-                    break
-                }
-            }
-            return minEval
         }
+        return score
     }
 
     private fun checkTerminal(board: Array<Array<Int>>): Boolean {
@@ -58,6 +46,7 @@ class Engine {
     }
 
     private fun evaluate(board: Array<Array<Int>>): Int {
+
         var aiPieces = 0
         var humanPieces = 0
 
@@ -88,16 +77,6 @@ class Engine {
         }
         return successorsList
     }
-
-    private fun addMoveToArray(pieceArray: Array<Array<Int>>, newMove: Pair<Point, Point>): Array<Array<Int>>{
-        TODO("Make deep copy?")
-        pieceArray[newMove.second.x][newMove.second.y] = pieceArray[newMove.first.x][newMove.first.y]
-        pieceArray[newMove.first.x][newMove.first.y] = 0
-
-        return pieceArray
-    }
-
-
 }
 
 fun generateMoves(

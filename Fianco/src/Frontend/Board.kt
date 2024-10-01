@@ -104,7 +104,7 @@ class Board : JComponent() {
             var nodesExplored = 0
 
             override fun doInBackground() {
-                val depth = 8  // Adjust the search depth as needed
+                val depth = 7  // Adjust the search depth as needed
                 val boardCopy = PieceManager.getBoardCopy()
                 val positionsCopy = createPiecePositionsFromBoard(boardCopy)
                 val bestMove = getBestMove(boardCopy, positionsCopy, depth)
@@ -175,18 +175,6 @@ class Board : JComponent() {
         }
     }
 
-    fun aiMoveOLD() {
-        val depth = 8  // Adjust as needed
-        val boardCopy = getBoardCopy()
-        val positionsCopy = createPiecePositionsFromBoard(boardCopy)
-        val bestMove = getBestMove(boardCopy, positionsCopy, depth)
-        if (bestMove != null) {
-            handleMoveAI(bestMove.first, bestMove.second, bestMove.third)
-        } else {
-            println("AI has no valid moves!")
-        }
-    }
-
     fun getBestMove(
         board: Array<Array<Int>>,
         positions: Map<Point, Color>,
@@ -203,7 +191,7 @@ class Board : JComponent() {
             for (toPosition in toPositions) {
                 val newBoard = copyBoard(board)
                 makeMove(newBoard, fromPosition, toPosition, moves.second == "Capture")
-                val boardValue = engine.alphaBeta(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, false)
+                val boardValue = engine.alphaBeta(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, 1) // change last value for minimising player. Current implementation assumes only one alpha-beta engine is playing against a human
                 if (boardValue > bestValue) {
                     bestValue = boardValue
                     bestMove = Triple(fromPosition, toPosition, if (moves.second == "Capture") moves.first else null)
