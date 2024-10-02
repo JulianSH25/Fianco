@@ -181,51 +181,59 @@ class Board : JComponent() {
     positions: Map<Point, Color>,
     maxDepth: Int,
     timeLimit: Long = 20000  // Time limit in milliseconds
-): Pair<Triple<Point, Point, Map<Point, List<Point>>?>?, Int> {
-    val engine = Engine()
-    engine.nodesExplored = 0  // Reset the node counter
+    ) : Pair<Triple<Point, Point, Map<Point, List<Point>>?>?, Int> {
+        val engine = Engine()
+        engine.nodesExplored = 0  // Reset the node counter
 
-    var bestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
-    var bestValue = Int.MIN_VALUE
-    val startTime = System.currentTimeMillis()
+        var bestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
+        var bestValue = Int.MIN_VALUE
+        val startTime = System.currentTimeMillis()
 
-    for (depth in 1..maxDepth) {
-        val timeElapsed = System.currentTimeMillis() - startTime
-        if (timeElapsed >= timeLimit) {
-            println("Time limit reached during depth $depth")
-            break
-        }
+        for (depth in 1..maxDepth) {
+            val timeElapsed = System.currentTimeMillis() - startTime
+            if (timeElapsed >= timeLimit) {
+                println("Time limit reached during depth $depth")
+                break
+            }
 
-        val moves = generateMoves(2, board, positions)  // AI is player 2 (black)
-        var currentBestValue = Int.MIN_VALUE
-        var currentBestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
+            val (moves, type_of_move) = generateMoves(2, board, positions)  // AI is player 2 (black)
+            var currentBestValue = Int.MIN_VALUE
+            var currentBestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
 
-        for ((fromPosition, toPositions) in moves.first) {
-            for (toPosition in toPositions) {
-                val newBoard = copyBoard(board)
-                makeMove(newBoard, fromPosition, toPosition, moves.second == "Capture")
-                val eval = -engine.alphaBetaWithTime(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, -1, startTime, timeLimit)
-                if (eval > currentBestValue) {
-                    currentBestValue = eval
-                    currentBestMove = Triple(fromPosition, toPosition, if (moves.second == "Capture") moves.first else null)
+        // Check if there's only one move and that move has exactly one destination
+        if (moves.size == 1 && moves.values.first().size == 1) {
+            // Get the key (fromPosition) and the single destination (toPosition)
+            val fromPosition = moves.keys.first()
+            val toPosition = moves.values.first().first()
+
+            }
+
+            for ((fromPosition, toPositions) in moves) {
+                for (toPosition in toPositions) {
+                    val newBoard = copyBoard(board)
+                    makeMove(newBoard, fromPosition, toPosition, type_of_move == "Capture")
+                    val eval = -engine.alphaBetaWithTime(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, -1, startTime, timeLimit)
+                    if (eval > currentBestValue) {
+                        currentBestValue = eval
+                        currentBestMove = Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
+                    }
+                    if (engine.timeUp) {
+                        break
+                    }
                 }
                 if (engine.timeUp) {
                     break
                 }
             }
-            if (engine.timeUp) {
+
+            if (!engine.timeUp) {
+                bestValue = currentBestValue
+                bestMove = currentBestMove
+                println("Depth $depth completed. Best value: $bestValue")
+            } else {
+                println("Time limit reached during depth $depth")
                 break
             }
-        }
-
-        if (!engine.timeUp) {
-            bestValue = currentBestValue
-            bestMove = currentBestMove
-            println("Depth $depth completed. Best value: $bestValue")
-        } else {
-            println("Time limit reached during depth $depth")
-            break
-        }
     }
 
     // Return the best move found within the time limit
