@@ -99,37 +99,38 @@ class Board : JComponent() {
         })
     }
 
+
     fun aiMove() {
         val aiWorker = object : SwingWorker<Unit, Unit>() {
             var nodesExplored = 0
 
-            override fun doInBackground() {
-                val depth = 7  // Adjust the search depth as needed
-                val boardCopy = PieceManager.getBoardCopy()
-                val positionsCopy = createPiecePositionsFromBoard(boardCopy)
-                val bestMove = getBestMove(boardCopy, positionsCopy, depth)
-                //nodesExplored = nodeCount
-                if (bestMove != null) {
-                    // Update the game state on the Event Dispatch Thread (EDT)
-                    SwingUtilities.invokeLater {
-                        handleMoveAI(bestMove.first, bestMove.second, bestMove.third)
-                        repaint()
-                        checkForWinner()
-                    }
-                } else {
-                    println("AI has no valid moves!")
-                }
-            }
-
-            override fun done() {
-                // Optionally update GUI components after AI move is completed
+        override fun doInBackground() {
+            val maxDepth = 10  // Set a reasonable maximum depth
+            val timeLimit = 20000L  // Time limit in milliseconds (e.g., 5 seconds)
+            val boardCopy = PieceManager.getBoardCopy()
+            val positionsCopy = createPiecePositionsFromBoard(boardCopy)
+            val (bestMove, nodeCount) = getBestMove(boardCopy, positionsCopy, maxDepth, timeLimit)
+            nodesExplored = nodeCount
+            if (bestMove != null) {
                 SwingUtilities.invokeLater {
-                    infoLabel.text = "Nodes explored: $nodesExplored | Depth: 3"
+                    handleMoveAI(bestMove.first, bestMove.second, bestMove.third)
+                    repaint()
+                    checkForWinner()
                 }
+            } else {
+                println("AI has no valid moves!")
             }
         }
-        aiWorker.execute()
+
+        override fun done() {
+            // Optionally update GUI components after AI move is completed
+            SwingUtilities.invokeLater {
+                infoLabel.text = "Nodes explored: $nodesExplored | Depth: variable (iterative deepening)"
+            }
+        }
     }
+    aiWorker.execute()
+}
 
     fun randomAI(){
         val playerIDINT = if (currentPlayer == Color.WHITE) 1 else if (currentPlayer == Color.BLACK) 2 else throw IndexOutOfBoundsException("Player ID error - check implementation of current player in Frontend")
@@ -176,31 +177,60 @@ class Board : JComponent() {
     }
 
     fun getBestMove(
-        board: Array<Array<Int>>,
-        positions: Map<Point, Color>,
-        depth: Int
-    ): Triple<Point, Point, Map<Point, List<Point>>?>? {
-        val engine = Engine()
-        engine.nodesExplored = 0
+    board: Array<Array<Int>>,
+    positions: Map<Point, Color>,
+    maxDepth: Int,
+    timeLimit: Long = 20000  // Time limit in milliseconds
+): Pair<Triple<Point, Point, Map<Point, List<Point>>?>?, Int> {
+    val engine = Engine()
+    engine.nodesExplored = 0  // Reset the node counter
 
-        var bestValue = Int.MIN_VALUE
-        var bestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
+    var bestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
+    var bestValue = Int.MIN_VALUE
+    val startTime = System.currentTimeMillis()
+
+    for (depth in 1..maxDepth) {
+        val timeElapsed = System.currentTimeMillis() - startTime
+        if (timeElapsed >= timeLimit) {
+            println("Time limit reached during depth $depth")
+            break
+        }
 
         val moves = generateMoves(2, board, positions)  // AI is player 2 (black)
+        var currentBestValue = Int.MIN_VALUE
+        var currentBestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
+
         for ((fromPosition, toPositions) in moves.first) {
             for (toPosition in toPositions) {
                 val newBoard = copyBoard(board)
                 makeMove(newBoard, fromPosition, toPosition, moves.second == "Capture")
-                val boardValue = engine.alphaBeta(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, 1) // change last value for minimising player. Current implementation assumes only one alpha-beta engine is playing against a human
-                if (boardValue > bestValue) {
-                    bestValue = boardValue
-                    bestMove = Triple(fromPosition, toPosition, if (moves.second == "Capture") moves.first else null)
+                val eval = -engine.alphaBetaWithTime(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, -1, startTime, timeLimit)
+                if (eval > currentBestValue) {
+                    currentBestValue = eval
+                    currentBestMove = Triple(fromPosition, toPosition, if (moves.second == "Capture") moves.first else null)
+                }
+                if (engine.timeUp) {
+                    break
                 }
             }
+            if (engine.timeUp) {
+                break
+            }
         }
-        println("EXPLORED NODES IN LAST ITERATION: ${engine.nodesExplored}")
-        return bestMove
+
+        if (!engine.timeUp) {
+            bestValue = currentBestValue
+            bestMove = currentBestMove
+            println("Depth $depth completed. Best value: $bestValue")
+        } else {
+            println("Time limit reached during depth $depth")
+            break
+        }
     }
+
+    // Return the best move found within the time limit
+    return Pair(bestMove, engine.nodesExplored)
+}
 
     fun handleMoveAI(oldPosition: Point, newPosition: Point, captureMap: Map<Point, List<Point>>? = null) {
 
