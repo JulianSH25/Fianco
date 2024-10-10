@@ -1,32 +1,28 @@
 package Frontend
 
-import Backend.Engine
+import Backend.AlphaBetaEngine
+import Backend.PieceManager
+import Backend.RandomEngine
 import Backend.UtilityFunctions.*
-import Frontend.PieceManager.setPiece
-import Frontend.PieceManager.getPiece
-import Frontend.PieceManager.getBoardCopy
-import Frontend.PieceManager.piecePositions
-import Frontend.PieceManager.movePiece
-import Frontend.PieceManager.capturePiece
-
-import Backend.Engine.*
+import Backend.UtilityFunctions.createPiecePositionsFromBoard
+import Backend.generateMoves
+import Backend.makeMove
 
 import javax.swing.SwingWorker
 import javax.swing.SwingUtilities
 import java.awt.*
 import java.awt.event.*
 import java.awt.image.BufferedImage
-import java.io.IOException
 import javax.imageio.ImageIO
 import javax.swing.*
 import javax.swing.border.LineBorder
-import kotlin.math.pow
-import kotlin.math.sqrt
-import kotlin.random.Random
 
 class Board : JComponent() {
 
     private val AIstarting = false
+
+    private val re = RandomEngine()
+    private val pm = PieceManager()
 
     private var initialiseAI = true
 
@@ -69,7 +65,7 @@ class Board : JComponent() {
 
                 val position = Point(row, column)
 
-                if (position in piecePositions && piecePositions[position] == currentPlayer) {
+                if (position in pm.piecePositions && pm.piecePositions[position] == currentPlayer) {
                     selectedPiece = position
                 }
             }
@@ -109,7 +105,7 @@ class Board : JComponent() {
         override fun doInBackground() {
             val maxDepth = 10  // Set a reasonable maximum depth
             val timeLimit = 5000L  // Time limit in milliseconds (e.g., 5 seconds)
-            val boardCopy = PieceManager.getBoardCopy()
+            val boardCopy = pm.getBoardCopy()
             val positionsCopy = createPiecePositionsFromBoard(boardCopy)
             val (bestMove, nodeCount) = getBestMove(boardCopy, positionsCopy, maxDepth, timeLimit)
             nodesExplored = nodeCount
@@ -134,56 +130,27 @@ class Board : JComponent() {
     aiWorker.execute()
 }
 
-    fun randomAI(){
-        val playerIDINT = if (currentPlayer == Color.WHITE) 1 else if (currentPlayer == Color.BLACK) 2 else throw IndexOutOfBoundsException("Player ID error - check implementation of current player in Frontend")
-        val pieceArray = getBoardCopy()
-
-        val (positionMap, typeOfMove) = generateMoves(playerIDINT, pieceArray)
-
-        val (randomkey, randommove) = pickRandomMove(positionMap)
-
-        handleMoveAI(randomkey, randommove, if (typeOfMove == "Capture") positionMap else null)
-
-    }
-
-    fun pickRandomMove(pieceMap: Map<Point, List<Point>>): Pair<Point, Point> {
-        if (pieceMap.isEmpty()) throw IOException("Empty piece map")
-
-        // Step 1: Get a random key (Point) from the map
-        val keys = pieceMap.keys.toList()
-        val randomKey = keys[Random.nextInt(keys.size)]
-
-        // Step 2: Get the associated list of points
-        val moves = pieceMap[randomKey] ?: throw IOException("piece map key does not exist")
-
-        // Step 3: Get a random move from the list of moves
-        if (moves.isEmpty()) return throw IOException("piece map move does not exist (key error)")
-        val randomMove = moves[Random.nextInt(moves.size)]
-
-        return Pair(randomKey, randomMove)
-    }
-
 
     private fun initializeBoard() {
         for (i in 0 until 9) {
-            setPiece(8, i, 1)
+            pm.setPiece(8, i, 1)
             if (AIstarting && i < 8) {
-                setPiece(0, i, 2)
+                pm.setPiece(0, i, 2)
             }
             else if (!AIstarting)
             {
-                setPiece(0, i, 2)
+                pm.setPiece(0, i, 2)
             }
         }
         if (AIstarting){
-            setPiece(1, 8, 2)
+            pm.setPiece(1, 8, 2)
         }
         for (i in 1 until 4) {
-            setPiece(8-i, i, 1)
-            setPiece(i, i, 2)
+            pm.setPiece(8-i, i, 1)
+            pm.setPiece(i, i, 2)
 
-            setPiece(i, 8 - i, 2)
-            setPiece(8 - i, 8 - i, 1)
+            pm.setPiece(i, 8 - i, 2)
+            pm.setPiece(8 - i, 8 - i, 1)
         }
     }
 
@@ -193,8 +160,8 @@ class Board : JComponent() {
     maxDepth: Int,
     timeLimit: Long = 20000  // Time limit in milliseconds
     ) : Pair<Triple<Point, Point, Map<Point, List<Point>>?>?, Int> {
-        val engine = Engine()
-        engine.nodesExplored = 0  // Reset the node counter
+        val alphaBetaEngine = AlphaBetaEngine(pm)
+        alphaBetaEngine.nodesExplored = 0  // Reset the node counter
 
         var bestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
         var bestValue = Int.MIN_VALUE
@@ -207,7 +174,7 @@ class Board : JComponent() {
                 break
             }
 
-            val (moves, type_of_move) = generateMoves(2, board, positions)  // AI is player 2 (black)
+            val (moves, type_of_move) = generateMoves(pm, 2, board, positions)  // AI is player 2 (black)
             var currentBestValue = Int.MIN_VALUE
             var currentBestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
 
@@ -226,21 +193,21 @@ class Board : JComponent() {
                 for (toPosition in toPositions) {
                     val newBoard = copyBoard(board)
                     makeMove(newBoard, fromPosition, toPosition, type_of_move == "Capture")
-                    val eval = -engine.alphaBetaWithTime(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, -1, startTime, timeLimit)
+                    val eval = -alphaBetaEngine.alphaBetaWithTime(newBoard, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, -1, startTime, timeLimit)
                     if (eval > currentBestValue) {
                         currentBestValue = eval
                         currentBestMove = Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
                     }
-                    if (engine.timeUp) {
+                    if (alphaBetaEngine.timeUp) {
                         break
                     }
                 }
-                if (engine.timeUp) {
+                if (alphaBetaEngine.timeUp) {
                     break
                 }
             }
 
-            if (!engine.timeUp) {
+            if (!alphaBetaEngine.timeUp) {
                 bestValue = currentBestValue
                 bestMove = currentBestMove
                 println("Depth $depth completed. Best value: $bestValue")
@@ -251,16 +218,16 @@ class Board : JComponent() {
     }
 
     // Return the best move found within the time limit
-    return Pair(bestMove, engine.nodesExplored)
+    return Pair(bestMove, alphaBetaEngine.nodesExplored)
 }
 
     fun handleMoveAI(oldPosition: Point, newPosition: Point, captureMap: Map<Point, List<Point>>? = null) {
 
         if (captureMap != null) {
-            capturePiece(oldPosition, newPosition)
+            pm.capturePiece(oldPosition, newPosition)
         }
         else{
-            movePiece(oldPosition, newPosition)
+            pm.movePiece(oldPosition, newPosition)
         }
 
         // Switch player
@@ -271,10 +238,10 @@ class Board : JComponent() {
     }
 
     fun handleMove(oldPosition: Point, newPosition: Point): Boolean {
-        val (validMove, captureMap) = isValidMove(oldPosition, newPosition, piecePositions, currentPlayer)
+        val (validMove, captureMap) = isValidMove(pm, oldPosition, newPosition, pm.piecePositions, currentPlayer)
 
         if (validMove) {
-            movePiece(oldPosition, newPosition)
+            pm.movePiece(oldPosition, newPosition)
             print("Old position: $oldPosition, New position: $newPosition")
 
             // Handle captures
@@ -285,8 +252,8 @@ class Board : JComponent() {
                 val capturedY = oldPosition.y + dy / 2
 
                 capturedPieces.find { it.x == capturedX && it.y == capturedY }?.let { capturedPiece ->
-                    piecePositions.remove(capturedPiece)
-                    setPiece(capturedPiece.x, capturedPiece.y, 0)
+                    pm.piecePositions.remove(capturedPiece)
+                    pm.setPiece(capturedPiece.x, capturedPiece.y, 0)
                     repaint()
                 }
                 print("Moved manually from $oldPosition to ${newPosition.x + dx}, ${newPosition.y} and removed piece at $capturedX, $capturedY")
@@ -306,7 +273,7 @@ class Board : JComponent() {
     }
 
     fun checkForWinner() {
-        val winner = checkVictory()
+        val winner = checkVictory(pm)
         if (winner != null) {
             val message: String = if (winner == Color.WHITE) "White Won!" else "Black Won!"
             JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
@@ -354,7 +321,7 @@ class Board : JComponent() {
                 g.fillRect(x, y, currentSquareSize, currentSquareSize)
 
                 // Draw the pieces in their new positions
-                val piece = piecePositions[Point(column, row)]
+                val piece = pm.piecePositions[Point(column, row)]
                 if (piece != null) {
                     val image = if (piece == Color.WHITE) redPawnImage else blackPawnImage
                     if (image != null) {
@@ -388,5 +355,3 @@ class Board : JComponent() {
         return Dimension(9 * Constants.SQUARE_SIZE, 9 * Constants.SQUARE_SIZE)
     }
 }
-
-private fun Engine.copyBoard(arrays: Array<Array<Int>>) {}

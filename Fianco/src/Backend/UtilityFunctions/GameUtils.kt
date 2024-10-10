@@ -1,8 +1,6 @@
 package Backend.UtilityFunctions
 
-import Frontend.PieceManager.getPiece
-import Frontend.PieceManager
-import Frontend.PieceManager.getBoardCopy
+import Backend.PieceManager as PieceManager
 import java.awt.Color
 import java.awt.Point
 import kotlin.collections.component1
@@ -21,19 +19,19 @@ fun getSquareName(col: Int, row: Int): String {
     return "$rowLetter$colNumber"
 }
 
-fun checkVictory(): Color? {
+fun checkVictory(pm: PieceManager): Color? {
     for (i in 0 until 9) {
-        if (getPiece(8, i) == 2) { // Black piece reached the bottom
+        if (pm.getPiece(8, i) == 2) { // Black piece reached the bottom
             return Color.BLACK
         }
-        if (getPiece(0, i) == 1) { // White piece reached the top
+        if (pm.getPiece(0, i) == 1) { // White piece reached the top
             return Color.WHITE
         }
     }
     return null // No winner yet
 }
 
-fun checkVictory(pieceArray: Array<Array<Int>> = getBoardCopy()): Color? {
+fun checkVictory(pm: PieceManager, pieceArray: Array<Array<Int>> = pm.getBoardCopy()): Color? {
     for (i in 0 until 9) {
         if (pieceArray[8][i] == 2) { // Black piece reached the bottom
             return Color.BLACK
@@ -46,10 +44,11 @@ fun checkVictory(pieceArray: Array<Array<Int>> = getBoardCopy()): Color? {
 }
 
 fun checkCapture(
-    piecePositions: Map<Point, Color> = PieceManager.piecePositions,
+    pm: PieceManager,
+    piecePositions: Map<Point, Color> = pm.piecePositions,
     currentPlayer: Color,
     AIMove: Boolean? = false,
-    pieceArray: Array<Array<Int>> = getBoardCopy()
+    pieceArray: Array<Array<Int>> = pm.getBoardCopy()
 ): Map<Point, List<Point>>? {
 
     val opponentColour = if (currentPlayer == Color.WHITE) 2 else 1
@@ -85,14 +84,14 @@ fun checkCapture(
     return if (captureMap.isNotEmpty()) captureMap else null
 }
 
-fun isValidMove(currentPosition: Point, newPosition: Point, piecePositions: Map<Point, Color>, currentPlayer: Color): Pair<Boolean, Map<Point, List<Point>>?> {
+fun isValidMove(pm: PieceManager, currentPosition: Point, newPosition: Point, piecePositions: Map<Point, Color>, currentPlayer: Color): Pair<Boolean, Map<Point, List<Point>>?> {
     //println("New Position: $newPosition, Current Position: $currentPosition")
     //println("New Position x: ${newPosition.x}, New Position y: ${newPosition.y}")
     // 1. Check if the new position is within the board bounds.
     if (newPosition.x !in 0..8 || newPosition.y !in 0..8) return Pair(false, null)
 
     // 2. Check if the new position is occupied.
-    val capturingPieces = checkCapture(piecePositions, currentPlayer)
+    val capturingPieces = checkCapture(pm, piecePositions, currentPlayer)
     if (capturingPieces != null) {
         val dx = abs(newPosition.x - currentPosition.x)
         val dy = abs(newPosition.y - currentPosition.y)

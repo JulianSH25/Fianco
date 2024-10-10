@@ -4,7 +4,6 @@ import java.awt.*
 import java.awt.event.*
 import javax.swing.*
 import javax.swing.border.LineBorder
-
 class FiancoGUI : JFrame() {
 
     private val gameNameLabel = JLabel("FIANCO")
