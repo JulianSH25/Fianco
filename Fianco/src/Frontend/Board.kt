@@ -26,6 +26,8 @@ import kotlin.random.Random
 
 class Board : JComponent() {
 
+    private val AIstarting = false
+
     private var initialiseAI = true
 
     private var selectedPiece: Point? = null
@@ -36,8 +38,8 @@ class Board : JComponent() {
 
     private val messageLabel = JLabel()
     private val infoLabel = JLabel()
-    private val redPawnImage: BufferedImage? = ImageIO.read(javaClass.getResource("figures/whitePawn.png"))
-    private val blackPawnImage: BufferedImage? = ImageIO.read(javaClass.getResource("figures/blackPawn.png"))
+    private val redPawnImage: BufferedImage? = ImageIO.read(if (AIstarting) javaClass.getResource("figures/blackPawn.png") else javaClass.getResource("figures/whitePawn.png"))
+    private val blackPawnImage: BufferedImage? = ImageIO.read(if (AIstarting) javaClass.getResource("figures/whitePawn.png") else javaClass.getResource("figures/blackPawn.png"))
     //val pieceArray = Array(9) { Array(9) { 0 } }
 
     private var globalCaptureMap = mutableMapOf<Point, MutableList<Point>>()
@@ -106,7 +108,7 @@ class Board : JComponent() {
 
         override fun doInBackground() {
             val maxDepth = 10  // Set a reasonable maximum depth
-            val timeLimit = 20000L  // Time limit in milliseconds (e.g., 5 seconds)
+            val timeLimit = 5000L  // Time limit in milliseconds (e.g., 5 seconds)
             val boardCopy = PieceManager.getBoardCopy()
             val positionsCopy = createPiecePositionsFromBoard(boardCopy)
             val (bestMove, nodeCount) = getBestMove(boardCopy, positionsCopy, maxDepth, timeLimit)
@@ -165,7 +167,16 @@ class Board : JComponent() {
     private fun initializeBoard() {
         for (i in 0 until 9) {
             setPiece(8, i, 1)
-            setPiece(0, i, 2)
+            if (AIstarting && i < 8) {
+                setPiece(0, i, 2)
+            }
+            else if (!AIstarting)
+            {
+                setPiece(0, i, 2)
+            }
+        }
+        if (AIstarting){
+            setPiece(1, 8, 2)
         }
         for (i in 1 until 4) {
             setPiece(8-i, i, 1)
@@ -200,12 +211,15 @@ class Board : JComponent() {
             var currentBestValue = Int.MIN_VALUE
             var currentBestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
 
-        // Check if there's only one move and that move has exactly one destination
-        if (moves.size == 1 && moves.values.first().size == 1) {
-            // Get the key (fromPosition) and the single destination (toPosition)
-            val fromPosition = moves.keys.first()
-            val toPosition = moves.values.first().first()
+            // Check if there's only one move and that move has exactly one destination
+            if (moves.size == 1 && moves.values.first().size == 1) {
+                // Get the key (fromPosition) and the single destination (toPosition)
+                val fromPosition = moves.keys.first()
+                val toPosition = moves.values.first().first()
 
+                // Set the best move directly
+                bestMove = Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
+                break  // Exit the loop since we found our move
             }
 
             for ((fromPosition, toPositions) in moves) {
