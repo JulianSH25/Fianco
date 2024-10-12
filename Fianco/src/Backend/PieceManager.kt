@@ -1,11 +1,11 @@
 package Backend
 
-import java.awt.Color
 import java.awt.Point
+import Backend.PlayerToMove
 
 class PieceManager {
     private val pieceArray: Array<Array<Int>> = Array(9) { Array(9) { 0 } }
-    val piecePositions = mutableMapOf<Point, Color>()
+    val piecePositions = mutableMapOf<Point, PlayerToMove>()
 
     // Get a piece at a specific row and column
     fun getPiece(row: Int, column: Int): Int = pieceArray[row][column]
@@ -17,7 +17,7 @@ class PieceManager {
         if (value == 0) {
             piecePositions.remove(point)
         } else {
-            piecePositions[point] = if (value == 1) Color.WHITE else Color.BLACK
+            piecePositions[point] = if (value == 1) PlayerToMove.PlayerOne else PlayerToMove.PlayerTwo
         }
     }
 

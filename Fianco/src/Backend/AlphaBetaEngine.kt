@@ -2,13 +2,15 @@ package Backend
 
 import Backend.UtilityFunctions.*
 
-import java.awt.Color
-//import java.util.List;
 import kotlin.collections.List
+import java.awt.Point
 
 class AlphaBetaEngine(pieceManager: PieceManager) {
 
     val pm = pieceManager
+
+    val tt = TranspositionTable()
+    val zobristHashing = Zobrist()
 
     var nodesExplored = 0
     var timeUp = false
@@ -34,7 +36,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             val winner = checkVictory(pm, board)
             return when {
                 winner == null -> 0  // Draw
-                (winner == Color.BLACK && player == 1) || (winner == Color.WHITE && player == -1) -> Int.MAX_VALUE - depth
+                (winner == PlayerToMove.PlayerTwo && player == 1) || (winner == PlayerToMove.PlayerOne && player == -1) -> Int.MAX_VALUE - depth
                 else -> Int.MIN_VALUE + depth
             }
         } else if (depth == 0) {
@@ -49,13 +51,12 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         val currentPlayerID = if (player == 1) 2 else 1
 
         for (child in successors(board, currentPlayerID)) {
+
             val eval = -alphaBetaWithTime(child, depth - 1, -beta, -alpha, -player, startTime, timeLimit)
             value = maxOf(value, eval)
             alpha = maxOf(alpha, value)
-            if (alpha >= beta) {
-                break
-            }
-            if (timeUp) {
+
+            if (alpha >= beta || timeUp) {
                 break
             }
         }
@@ -120,6 +121,10 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             }
         }
         return score
+    }
+
+    fun printStatistics(){
+        println("Nodes explored: $nodesExplored")
     }
 
     private fun successors(board: Array<Array<Int>>, playerID: Int): List<Array<Array<Int>>> {

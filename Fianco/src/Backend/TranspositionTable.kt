@@ -14,6 +14,10 @@ val max_buckets = 1024000
  * - The depth at which the score was calculated.
  * - The type of score (accurate, fail-low, fail-high).
  */
+enum class ScoreType {
+    EXACT, LOWER_BOUND, UPPER_BOUND
+}
+
 class TableEntry {
     /**
      * Enum representing the type of score stored.
@@ -22,15 +26,12 @@ class TableEntry {
      * - FAIL_LOW: The score is a lower bound (alpha cut-off).
      * - FAIL_HIGH: The score is an upper bound (beta cut-off).
      */
-    enum class ScoreType {
-        ACCURATE, FAIL_LOW, FAIL_HIGH
-    }
 
     /** The Zobrist hash value representing the board position. */
     var hashValue: Long = 0L
 
     /** The type of score stored (accurate, fail-low, fail-high). */
-    var scoreType: ScoreType = ScoreType.ACCURATE
+    var scoreType: ScoreType = ScoreType.EXACT
 
     /** The score of the board position evaluated at a certain depth. */
     var score: Int = 0

@@ -3,19 +3,18 @@ package Backend
 import Backend.UtilityFunctions.checkCapture
 import Backend.UtilityFunctions.checkValidMove
 import Backend.UtilityFunctions.createPiecePositionsFromBoard
-import java.awt.Color
 import java.awt.Point
 
 fun generateMoves(pm: PieceManager,
     playerID: Int,
     pieceArray: Array<Array<Int>>,
-    positions: Map<Point, Color>? = null
+    positions: Map<Point, PlayerToMove>? = null
 ): Pair<Map<Point, List<Point>>, String> {
 
     val piecePositions = positions ?: createPiecePositionsFromBoard(pieceArray)
-    val colour = if (playerID == 1) Color.WHITE else Color.BLACK
+    val player = if (playerID == 1) PlayerToMove.PlayerOne else PlayerToMove.PlayerTwo
 
-    val validMoves = checkCapture(pm, piecePositions, colour, true, pieceArray)
+    val validMoves = checkCapture(pm, piecePositions, player, true, pieceArray)
     if (validMoves != null) {
         //println("Move: CAPTURE")
         //printPositionMap(validMoves)
@@ -25,8 +24,8 @@ fun generateMoves(pm: PieceManager,
     val i = if (playerID == 1) -1 else 1
     val positionMap = mutableMapOf<Point, List<Point>>()
 
-    for ((position, pieceColor) in piecePositions) {
-        if (pieceColor == colour) {
+    for ((position, piecePlayer) in piecePositions) {
+        if (piecePlayer == player) {
             val x = position.x
             val y = position.y
 
@@ -36,7 +35,7 @@ fun generateMoves(pm: PieceManager,
                 Point(x, y + 1)         // Right
             )
             val validPositions = potentialMoves.filter {
-                checkValidMove(position, it, piecePositions, colour)
+                checkValidMove(position, it, piecePositions, player)
             }
             if (validPositions.isNotEmpty()) {
                 positionMap[position] = validPositions
