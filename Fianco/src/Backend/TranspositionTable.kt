@@ -28,7 +28,7 @@ class TableEntry {
      */
 
     /** The Zobrist hash value representing the board position. */
-    var hashValue: Long = 0L
+    var hashValue: ULong = 0u
 
     /** The type of score stored (accurate, fail-low, fail-high). */
     var scoreType: ScoreType = ScoreType.EXACT
@@ -40,7 +40,7 @@ class TableEntry {
     var bestMove: Pair<Point, Point>? = null
 
     /** The depth of the search at which this score was calculated. */
-    var depth: Int = 0
+    var searchDepth: Int = 0
 }
 
 /**
@@ -60,7 +60,7 @@ class BucketItem(
      * @param hashValue The Zobrist hash value to search for.
      * @return The matching `TableEntry` if found; otherwise, `null`.
      */
-    fun getElement(hashValue: Long): TableEntry? {
+    fun getElement(hashValue: ULong): TableEntry? {
         return if (entry.hashValue == hashValue) {
             entry
         } else {
@@ -79,7 +79,7 @@ class BucketItem(
             entry.score = newEntry.score
             entry.scoreType = newEntry.scoreType
             entry.bestMove = newEntry.bestMove
-            entry.depth = newEntry.depth
+            entry.searchDepth = newEntry.searchDepth
         } else {
             if (next == null) {
                 next = BucketItem(newEntry)
@@ -113,7 +113,8 @@ class TranspositionTable {
      * @param hashValue The Zobrist hash value of the board position.
      * @return The corresponding `TableEntry` if found; otherwise, `null`.
      */
-    fun getEntry(hashValue: Long): TableEntry? {
+    fun getEntry(hashValue: ULong): TableEntry? {
+        //println("TT Lookup for hash: $hashValue")
         return hashArray.getEntry(hashValue)
     }
 
@@ -137,11 +138,11 @@ class TranspositionTable {
 class HashArray {
     companion object {
         /** The number of buckets in the hash table (size of the table). */
-        const val MAX_BUCKETS = 1_024_000
+        const val MAX_BUCKETS: UInt = 1024000u
     }
 
     /** The array of buckets representing the transposition table. */
-    private val buckets: Array<BucketItem?> = arrayOfNulls(MAX_BUCKETS)
+    private val buckets: Array<BucketItem?> = arrayOfNulls(MAX_BUCKETS.toInt())
 
     /**
      * Retrieves an entry from the transposition table based on the hash value.
@@ -149,8 +150,10 @@ class HashArray {
      * @param hashValue The Zobrist hash value of the board position.
      * @return The corresponding `TableEntry` if found; otherwise, `null`.
      */
-    fun getEntry(hashValue: Long): TableEntry? {
-        val index = (hashValue % MAX_BUCKETS).toInt()
+    fun getEntry(hashValue: ULong): TableEntry? {
+        //println("hash array Lookup for hash: $hashValue")
+        val index = (hashValue % MAX_BUCKETS.toUInt()).toInt()
+        //println("hash array Lookup for index: $index")
         val bucket = buckets[index]
         return bucket?.getElement(hashValue)
     }
@@ -163,7 +166,7 @@ class HashArray {
      * @param entry The `TableEntry` to store.
      */
     fun storeEntry(entry: TableEntry) {
-        val index = (entry.hashValue % MAX_BUCKETS).toInt()
+        val index = (entry.hashValue % MAX_BUCKETS.toUInt()).toInt()
         val bucket = buckets[index]
         if (bucket == null) {
             // No collision; place the entry directly

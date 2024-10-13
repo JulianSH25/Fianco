@@ -29,7 +29,6 @@ class FiancoGUI : JFrame() {
         clockBox.border = LineBorder(Color.BLACK)
         clockBox.add(clockLabel)
         add(clockBox, BorderLayout.EAST)
-
         board.border = LineBorder(Color.BLACK)
 
         val mainPanel = JPanel(BorderLayout())

@@ -19,12 +19,14 @@ import Backend.PlayerTypes
 import Backend.Player.setPlayers
 import Backend.Player.getPlayerToMove
 import Backend.PlayerToMove
+import Backend.Zobrist
 import Backend.Player as player
 
 class Board : JComponent() {
 
     private val AIstarting = false
     private val pm = PieceManager()
+    private val zb = Zobrist()
 
     private var initialiseAI = true
 
@@ -97,11 +99,12 @@ class Board : JComponent() {
 
 
     fun aiMove() {
+        println("AI MOVE - thinking!")
         val aiWorker = object : SwingWorker<Unit, Unit>() {
             var nodesExplored = 0
 
         override fun doInBackground() {
-            val maxDepth = 10  // Set a reasonable maximum depth
+            val maxDepth = 12  // Set a reasonable maximum depth
             val timeLimit = 5000L  // Time limit in milliseconds (e.g., 5 seconds)
             val boardCopy = pm.getBoardCopy()
             val positionsCopy = createPiecePositionsFromBoard(boardCopy)
@@ -188,19 +191,23 @@ class Board : JComponent() {
                 break  // Exit the loop since we found our move
             }
 
+            zb.currentBoardHash = zb.calculateInitialHash(board)
+
             for ((fromPosition, toPositions) in moves) {
                 for (toPosition in toPositions) {
                     val newBoard = copyBoard(board)
                     makeMove(newBoard, fromPosition, toPosition, type_of_move == "Capture")
-                    val eval = -alphaBetaEngine.alphaBetaWithTime(
+                    val newEval = alphaBetaEngine.alphaBetaWithTime(
                         newBoard,
                         depth - 1,
                         Int.MIN_VALUE,
                         Int.MAX_VALUE,
-                        -1,
+                        PlayerToMove.PlayerOne,
                         startTime,
-                        timeLimit
+                        timeLimit,
+                        zb.updateHash(zb.currentBoardHash, Pair(fromPosition, toPosition), if (player.getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2)
                     )
+                    val eval = -newEval.first
                     if (eval > currentBestValue) {
                         currentBestValue = eval
                         currentBestMove =

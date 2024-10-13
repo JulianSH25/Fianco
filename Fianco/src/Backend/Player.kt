@@ -39,5 +39,9 @@ object Player{
     fun switchPlayerToMove(){
         CurrentPlayer = if (CurrentPlayer == PlayerToMove.PlayerOne) PlayerToMove.PlayerTwo else PlayerToMove.PlayerOne
     }
+
+    fun getOtherPlayer(player: PlayerToMove): PlayerToMove {
+        return if(player == PlayerToMove.PlayerOne) PlayerToMove.PlayerTwo else PlayerToMove.PlayerOne
+    }
 }
 
