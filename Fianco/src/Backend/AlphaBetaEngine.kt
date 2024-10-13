@@ -4,6 +4,7 @@ import Backend.UtilityFunctions.*
 import java.awt.Point
 
 import kotlin.collections.List
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 
@@ -16,16 +17,19 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
     var nodesExplored = 0
     var successfullTTlookups = 0
+    var collisions = 0
+    var newlyAddedEntries = 0
     var timeUp = false
+
+    val killerMoves = Array(20) { mutableListOf<Pair<Point, Point>>() }
 
     fun alphaBetaWithTime(
     board: Array<Array<Int>>,
-    depth: Int,
+    depth: Byte,
     alpha: Int,
     beta: Int,
     player: PlayerToMove,  // 1 for AI, -1 for human
-    startTime: Long,
-    timeLimit: Long,
+    timeObject: TimeKeeper,
     zobrHash: ULong = 0u
 ): Pair<Int, Pair<Point, Point>?> {
         //println("executing alpha-beta")
@@ -54,7 +58,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             }
         }
 
-        if (currentTime - startTime >= timeLimit) {
+        if (timeObject.timeUp) {
             timeUp = true
             return Pair(0, null)  // Return a neutral value since time is up
         }
@@ -67,7 +71,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
                 (winner == PlayerToMove.PlayerOne && playerMultiplier == -1) -> Pair(Int.MAX_VALUE - depth, null)
                 else -> Pair(Int.MIN_VALUE + depth, null)
             }
-        } else if (depth == 0) {
+        } else if (depth == 0.toByte()) {
             return Pair(playerMultiplier * evaluate(board), null)
         }
 
@@ -82,7 +86,8 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             val move = child.second
             val newHash = zb.updateHash(zobrHash, Pair(move.first, move.second), if (Player.getOtherPlayer(player) == PlayerToMove.PlayerOne) 1 else 2) // Ensure correctness
 
-            val newEval = alphaBetaWithTime(child.first, depth - 1, -beta, -alpha, Player.getOtherPlayer(player), startTime, timeLimit, newHash)
+            val newEval = alphaBetaWithTime(child.first,
+                (depth - 1).toByte(), -beta, -alpha, Player.getOtherPlayer(player), timeObject, newHash)
             val eval = -newEval.first
 
             if (eval > bestValue) {
@@ -165,12 +170,22 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             for (y in board[x].indices) {
                 when (board[x][y]) {
                     1 -> { // Human piece (white)
+                        //Piece difference
                         score -= 100  // Each human piece is bad for AI
-                        score -= (8 - x) * 10  // Closer to AI's side is worse
+
+                        //Advancement:
+                        //score -= (8 - x) * 10  // Closer to AI's side is worse
+                        score -= exp((8 - x).toDouble()).toInt()
+                        //score -= (log((8 - x + 1).toDouble()) * 10).toInt()
                     }
                     2 -> { // AI piece (black)
+                        //Piece difference
                         score += 100  // Each AI piece is good for AI
-                        score += x * 10  // The further down the board, the better
+
+                        //Advancement:
+                        //score += x * 10  // The further down the board, the better
+                        score += exp(x.toDouble()).toInt()
+                        //score += (log(x.toDouble() + 1) * 10).toInt()
                     }
                 }
             }
@@ -181,6 +196,11 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
     fun printStatistics(){
         println("Nodes explored: $nodesExplored")
         println("Successfull TT-lookups: $successfullTTlookups")
+        println("Collisions: ${Backend.collisions}")
+        println("newly Added Entries = ${Backend.newlyAddedEntries - Backend.collisions}")
+
+        Backend.collisions = 0
+        Backend.newlyAddedEntries = 0
     }
 
     private fun successors(board: Array<Array<Int>>, playerID: Int): List<Pair<Array<Array<Int>>, Pair<Point, Point>>> {

@@ -20,6 +20,7 @@ import Backend.Player.setPlayers
 import Backend.Player.getPlayerToMove
 import Backend.PlayerToMove
 import Backend.Zobrist
+import TimeKeeper
 import Backend.Player as player
 
 class Board : JComponent() {
@@ -104,8 +105,8 @@ class Board : JComponent() {
             var nodesExplored = 0
 
         override fun doInBackground() {
-            val maxDepth = 12  // Set a reasonable maximum depth
-            val timeLimit = 5000L  // Time limit in milliseconds (e.g., 5 seconds)
+            val maxDepth: Byte = 30  // Set a reasonable maximum depth
+            val timeLimit: Short = 10000  // Time limit in milliseconds (e.g., 5 seconds)
             val boardCopy = pm.getBoardCopy()
             val positionsCopy = createPiecePositionsFromBoard(boardCopy)
             val (bestMove, nodeCount) = getBestMove(boardCopy, positionsCopy, maxDepth, timeLimit)
@@ -156,22 +157,25 @@ class Board : JComponent() {
     }
 
     fun getBestMove(
-    board: Array<Array<Int>>,
-    positions: Map<Point, PlayerToMove>,
-    maxDepth: Int,
-    timeLimit: Long = 20000  // Time limit in milliseconds
+        board: Array<Array<Int>>,
+        positions: Map<Point, PlayerToMove>,
+        maxDepth: Byte,
+        timeLimit: Short = 20000  // Time limit in milliseconds
     ) : Pair<Triple<Point, Point, Map<Point, List<Point>>?>?, Int> {
 
         val alphaBetaEngine = AlphaBetaEngine(pm)
+
         alphaBetaEngine.nodesExplored = 0  // Reset the node counter
+        alphaBetaEngine.successfullTTlookups = 0
 
         var bestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
         var bestValue = Int.MIN_VALUE
-        val startTime = System.currentTimeMillis()
+        val tk = TimeKeeper(timeLimit)
+        //val startTime = System.currentTimeMillis()
 
         for (depth in 1..maxDepth) {
-            val timeElapsed = System.currentTimeMillis() - startTime
-            if (timeElapsed >= timeLimit) {
+            //val timeElapsed = System.currentTimeMillis() - startTime
+            if (tk.timeUp/**timeElapsed >= timeLimit**/) {
                 println("Time limit reached during depth $depth")
                 break
             }
@@ -199,12 +203,11 @@ class Board : JComponent() {
                     makeMove(newBoard, fromPosition, toPosition, type_of_move == "Capture")
                     val newEval = alphaBetaEngine.alphaBetaWithTime(
                         newBoard,
-                        depth - 1,
+                        (depth - 1).toByte(),
                         Int.MIN_VALUE,
                         Int.MAX_VALUE,
                         PlayerToMove.PlayerOne,
-                        startTime,
-                        timeLimit,
+                        tk,
                         zb.updateHash(zb.currentBoardHash, Pair(fromPosition, toPosition), if (player.getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2)
                     )
                     val eval = -newEval.first

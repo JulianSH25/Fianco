@@ -2,7 +2,10 @@ package Backend
 
 import java.awt.Point
 
-val max_buckets = 1024000
+//val max_buckets = 1024000
+
+var newlyAddedEntries = 0
+var collisions = 0
 
 /**
  * Represents an entry in the transposition table.
@@ -40,7 +43,7 @@ class TableEntry {
     var bestMove: Pair<Point, Point>? = null
 
     /** The depth of the search at which this score was calculated. */
-    var searchDepth: Int = 0
+    var searchDepth: Byte = 0
 }
 
 /**
@@ -75,6 +78,7 @@ class BucketItem(
      */
     fun addOrReplaceEntry(newEntry: TableEntry) {
         if (entry.hashValue == newEntry.hashValue) {
+            collisions++
             // Replace the existing entry
             entry.score = newEntry.score
             entry.scoreType = newEntry.scoreType
@@ -124,6 +128,7 @@ class TranspositionTable {
      * @param entry The `TableEntry` to store.
      */
     fun storeEntry(entry: TableEntry) {
+        newlyAddedEntries++
         hashArray.storeEntry(entry)
     }
 
@@ -138,7 +143,7 @@ class TranspositionTable {
 class HashArray {
     companion object {
         /** The number of buckets in the hash table (size of the table). */
-        const val MAX_BUCKETS: UInt = 1024000u
+        const val MAX_BUCKETS: UInt = 536870912u //268435456u //1024000u //1073741824u
     }
 
     /** The array of buckets representing the transposition table. */
