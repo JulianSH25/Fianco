@@ -16,8 +16,6 @@ fun generateMoves(pm: PieceManager,
 
     val validMoves = checkCapture(pm, piecePositions, player, true, pieceArray)
     if (validMoves != null) {
-        //println("Move: CAPTURE")
-        //printPositionMap(validMoves)
         return Pair(validMoves, "Capture")
     }
 
@@ -42,7 +40,5 @@ fun generateMoves(pm: PieceManager,
             }
         }
     }
-    //println("Move: REGULAR")
-    //printPositionMap(positionMap)
     return if (positionMap.isNotEmpty()) Pair(positionMap, "Regular") else throw NullPointerException("No valid moves")
 }

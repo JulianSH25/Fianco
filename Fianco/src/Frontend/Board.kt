@@ -1,6 +1,7 @@
 package Frontend
 
 import Backend.AlphaBetaEngine
+import Backend.HistoryHeuristic
 import Backend.PieceManager
 import Backend.UtilityFunctions.*
 import Backend.UtilityFunctions.createPiecePositionsFromBoard
@@ -208,13 +209,12 @@ class Board : JComponent() {
                         Int.MAX_VALUE,
                         PlayerToMove.PlayerOne,
                         tk,
-                        zb.updateHash(zb.currentBoardHash, Pair(fromPosition, toPosition), if (player.getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2)
+                        zb.updateHash(zb.currentBoardHash, Pair(fromPosition, toPosition), if (getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2)
                     )
                     val eval = -newEval.first
                     if (eval > currentBestValue) {
                         currentBestValue = eval
-                        currentBestMove =
-                            Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
+                        currentBestMove = Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
                     }
                     if (alphaBetaEngine.timeUp) {
                         break
@@ -229,6 +229,8 @@ class Board : JComponent() {
                 bestValue = currentBestValue
                 bestMove = currentBestMove
                 println("Depth $depth completed. Best value: $bestValue")
+
+                HistoryHeuristic.decay()
             } else {
                 println("Time limit reached during depth $depth")
                 break

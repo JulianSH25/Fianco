@@ -77,17 +77,34 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
         nodesExplored++
         var bestValue = Int.MIN_VALUE
+        var bestFoundMove: Pair<Point, Point>? = null
 
         val currentPlayerID = if (playerMultiplier == 1) 2 else 1
 
-        var bestFoundMove: Pair<Point, Point> = Pair(Point(0, 0), Point(1, 0)) // Placeholder
+        // Generate all possible moves
+        val allMoves = successors(board, currentPlayerID).map { it.second }
 
-        for (child in successors(board, currentPlayerID)) {
-            val move = child.second
-            val newHash = zb.updateHash(zobrHash, Pair(move.first, move.second), if (Player.getOtherPlayer(player) == PlayerToMove.PlayerOne) 1 else 2) // Ensure correctness
+        // Sort moves based on History Heuristic
+        val sortedMoves = allMoves.sortedByDescending { HistoryHeuristic.getScore(it) }
 
-            val newEval = alphaBetaWithTime(child.first,
-                (depth - 1).toByte(), -beta, -alpha, Player.getOtherPlayer(player), timeObject, newHash)
+        for (move in sortedMoves) {
+            val (from, to) = move
+            val newBoard = copyBoard(board)
+            makeMove(newBoard, from, to, /* isCapture = */ true)  // Adjust if necessary
+            val newHash = zb.updateHash(
+                zobrHash,
+                move,
+                if (player == PlayerToMove.PlayerOne) 2 else 1
+            )
+            val newEval = alphaBetaWithTime(
+                newBoard,
+                (depth - 1).toByte(),
+                -beta,
+                -alpha,
+                Player.getOtherPlayer(player),
+                timeObject,
+                newHash
+            )
             val eval = -newEval.first
 
             if (eval > bestValue) {
@@ -98,6 +115,9 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             alpha = max(alpha, bestValue)
 
             if (alpha >= beta || timeUp) {
+                if (alpha >= beta && bestFoundMove != null) {
+                    HistoryHeuristic.increment(bestFoundMove)
+                }
                 break
             }
         }
