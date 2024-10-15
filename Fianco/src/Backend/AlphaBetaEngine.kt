@@ -2,9 +2,12 @@ package Backend
 
 import Backend.UtilityFunctions.*
 import java.awt.Point
+import java.io.Serializable
 
 import kotlin.collections.List
 import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.log
 import kotlin.math.max
 import kotlin.math.min
 
@@ -15,11 +18,19 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
     val tt = TranspositionTable()
     val zb = Zobrist()
 
+    // Some debugging/statistics values:
+    var maxAdaptiveDepth = 0
+    var maxAchievedDepth: Byte = 0
+    var adaptiveIterations = 0
     var nodesExplored = 0
     var successfullTTlookups = 0
     var collisions = 0
     var newlyAddedEntries = 0
+
+
     var timeUp = false
+
+    val adaptiveDepthIncrease: Byte = 5 // implementing nominal depth; // TODO Would it be a good idea to switch randomly between e.g. depth 9 and 10 (to weigh pessimistic - optimistic view)?
 
     val killerMoves = Array(20) { mutableListOf<Pair<Point, Point>>() }
 
@@ -30,7 +41,8 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
     beta: Int,
     player: PlayerToMove,  // 1 for AI, -1 for human
     timeObject: TimeKeeper,
-    zobrHash: ULong = 0u
+    zobrHash: ULong = 0u,
+    adaptiveFlag: Boolean? = false // set to true when continuing search under the adaptive scheme, to not continue search until a definite win or loss is found.
 ): Pair<Int, Pair<Point, Point>?> {
         //println("executing alpha-beta")
         val playerMultiplier = if (player == PlayerToMove.PlayerOne) -1 else 1
@@ -39,6 +51,8 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         var alpha = alpha
         val oldAlpha = alpha
         var beta = beta
+        var adaptiveFlag = adaptiveFlag
+        var depth = depth
 
 
         //println("initiating tt lookup")
@@ -72,7 +86,33 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
                 else -> Pair(Int.MIN_VALUE + depth, null)
             }
         } else if (depth == 0.toByte()) {
-            return Pair(playerMultiplier * evaluate(board), null)
+            val evaluationResult = evaluate(board, true)
+            //println("Evaluation result received: $evaluationResult")
+            var evaluationScore = playerMultiplier * evaluationResult.first
+            //println("Evaluation score calculated: $evaluationScore, Adaptive Flag: $adaptiveFlag")
+
+            val contWithAdaptiveDepth = adaptiveSchemeEvaluation(evaluationScore, evaluationResult.second!!)
+
+            //print("Continue with adaptive depth? $contWithAdaptiveDepth")
+
+            // Adaptive Search Depth check:
+            if (adaptiveFlag == true || contWithAdaptiveDepth == false){
+                //println("exciting node, returning eval value")
+                return Pair(evaluationScore, null)  // do not continue with increase search depth
+            }
+            else{
+                adaptiveFlag = true  // set the flag to true as to continue the search below. Depth to nominal increased search depth (added)
+                val newDepth = (max(1, (ln(depth.toDouble()) * depth).toInt())).toByte()
+
+                // Statistics:
+                adaptiveIterations++
+                maxAdaptiveDepth = max(maxAdaptiveDepth, depth + newDepth)
+                //maxAchievedDepth = max(maxAchievedDepth, depth)
+
+                depth = newDepth
+
+                //println("Continuing search with new depth: $depth")
+            }
         }
 
         nodesExplored++
@@ -103,7 +143,8 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
                 -alpha,
                 Player.getOtherPlayer(player),
                 timeObject,
-                newHash
+                newHash,
+                adaptiveFlag
             )
             val eval = -newEval.first
 
@@ -183,34 +224,77 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         return checkVictory(pm, board) != null
     }
 
-    private fun evaluate(board: Array<Array<Int>>): Int {
+    private fun evaluate(board: Array<Array<Int>>, adaptiveThreshold: Boolean? = false): Pair<Int, IntArray?> {
+        //println("Evaluating")
         var score = 0
+
+        var pieceDifference = 0
+        var distanceToOtherSideAdvantage = 0
+
+        val pieceDifferenceWeight = 0.5
+        val distanceWeight = 0.5
 
         for (x in board.indices) {
             for (y in board[x].indices) {
                 when (board[x][y]) {
                     1 -> { // Human piece (white)
                         //Piece difference
-                        score -= 100  // Each human piece is bad for AI
+                        pieceDifference -= 1  // Each human piece is bad for AI
 
-                        //Advancement:
-                        //score -= (8 - x) * 10  // Closer to AI's side is worse
-                        score -= exp((8 - x).toDouble()).toInt()
-                        //score -= (log((8 - x + 1).toDouble()) * 10).toInt()
+                        /**Advancement (tried out different non-linear weighting methods to emphasize forward movement of individual pieces over 'whole army' movements and make the game faster & more exciting):**/
+                        //distanceToOtherSideAdvantage -= (8 - x) * 10  // Closer to AI's side is worse
+                        distanceToOtherSideAdvantage -= exp((8 - x).toDouble()).toInt()
+                        //distanceToOtherSideAdvantage -= (log((8 - x + 1).toDouble(),base = 2.14) * 10).toInt()
                     }
                     2 -> { // AI piece (black)
                         //Piece difference
-                        score += 100  // Each AI piece is good for AI
+                        pieceDifference += 1  // Each AI piece is good for AI
 
                         //Advancement:
-                        //score += x * 10  // The further down the board, the better
-                        score += exp(x.toDouble()).toInt()
-                        //score += (log(x.toDouble() + 1) * 10).toInt()
+                        //distanceToOtherSideAdvantage += x * 10  // The further down the board, the better
+                        distanceToOtherSideAdvantage += exp(x.toDouble()).toInt()
+                        //distanceToOtherSideAdvantage += (log(x.toDouble() + 1,base = 2.14) * 10).toInt()
                     }
                 }
             }
         }
-        return score
+
+        //println("Evaluation finished")
+
+        score = (100 * pieceDifference).toInt() + (1 * distanceToOtherSideAdvantage).toInt()
+
+        //println("Score: $score, individual weights: $pieceDifference, $distanceToOtherSideAdvantage")
+
+        /** If evaluation used to decide on continuing the search (Adaptive Scheme Framework - Adaptive Search Depth**/
+        if (adaptiveThreshold == true){
+            val individualValues = intArrayOf(pieceDifference, distanceToOtherSideAdvantage)
+            //println("returning evaluation, no error here")
+            return Pair(score, individualValues)
+        }
+        /**Else (regular evaluation & return of value) **/
+        return Pair(score, null)  // currently not in use, but who knows when it might become useful (saving memory by not creating the list in the first place)
+    }
+
+    /** Method to decide whether to continue searching in an ADAPTIVE SEARCH DEPTH style, using the (most sophisticated) ADAPTIVE SCHEME from the lecture**/
+    fun adaptiveSchemeEvaluation(score: Int, individualValues: IntArray): Boolean {
+        //println("Starting Adaptive evaluation")
+        // Safely cast the returned Serializable to Pair<Int, IntArray>
+        val pieceD = individualValues[0]
+        val forwardM = individualValues[1]
+
+        //println("Evaluating $pieceD, $forwardM")
+
+        // Define your threshold based on domain knowledge
+        // Example thresholds (adjust these based on your specific needs)
+        val pieceDifferenceThreshold = 2   // e.g., significant material advantage
+        val distanceThreshold = 20         // e.g., significant positional advantage
+
+        // Decide whether to continue searching deeper
+        val shouldDeepen = (score > 0 && (pieceD >= pieceDifferenceThreshold) || (forwardM >= distanceThreshold))
+
+        //print("Adaptive Scheme: $shouldDeepen")
+
+        return shouldDeepen
     }
 
     fun printStatistics(){
@@ -218,9 +302,12 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         println("Successfull TT-lookups: $successfullTTlookups")
         println("Collisions: ${Backend.collisions}")
         println("newly Added Entries = ${Backend.newlyAddedEntries - Backend.collisions}")
+        println("Adaptive Search depth - #TimesCalled: $adaptiveIterations, Maximum Search Depth achieved: $maxAdaptiveDepth")
 
         Backend.collisions = 0
         Backend.newlyAddedEntries = 0
+        adaptiveIterations = 0
+        maxAdaptiveDepth = 0
     }
 
     private fun successors(board: Array<Array<Int>>, playerID: Int): List<Pair<Array<Array<Int>>, Pair<Point, Point>>> {
