@@ -27,12 +27,14 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
     var collisions = 0
     var newlyAddedEntries = 0
 
+    var alphabetacycles: Byte = 0
+
 
     var timeUp = false
 
     val adaptiveDepthIncrease: Byte = 5 // implementing nominal depth; // TODO Would it be a good idea to switch randomly between e.g. depth 9 and 10 (to weigh pessimistic - optimistic view)?
 
-    val killerMoves = Array(20) { mutableListOf<Pair<Point, Point>>() }
+    val killerMoves = HashMap<Pair<Point, Point>, Int>()
 
     fun alphaBetaWithTime(
     board: Array<Array<Int>>,
@@ -58,7 +60,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         //println("initiating tt lookup")
         val n = tt.getEntry(zobrHash)
         //("finished tt lookup")
-        if (n != null && n.searchDepth >= depth) {
+        if (n != null && n.searchDepth >= depth && n.age < alphabetacycles-n.searchDepth) {
             //println("successfull tt lookup")
             successfullTTlookups++
             when (n.scoreType) {
@@ -178,6 +180,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             scoreType = flag
             searchDepth = depth
             bestMove = bestFoundMove
+            age = alphabetacycles
         }
         tt.storeEntry(entry)
 
@@ -233,20 +236,24 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
         val pieceDifferenceWeight = 0.5
         val distanceWeight = 0.5
+        var noPiecesOpponent = Int.MAX_VALUE
+        var noPiecesOwn = Int.MIN_VALUE
 
         for (x in board.indices) {
             for (y in board[x].indices) {
                 when (board[x][y]) {
                     1 -> { // Human piece (white)
+                        noPiecesOpponent = 0
                         //Piece difference
                         pieceDifference -= 1  // Each human piece is bad for AI
 
                         /**Advancement (tried out different non-linear weighting methods to emphasize forward movement of individual pieces over 'whole army' movements and make the game faster & more exciting):**/
                         //distanceToOtherSideAdvantage -= (8 - x) * 10  // Closer to AI's side is worse
-                        distanceToOtherSideAdvantage -= exp((8 - x).toDouble()).toInt()
+                        distanceToOtherSideAdvantage -= exp((9 - x).toDouble()).toInt() // using 9 instead of 8 experimentally, to punish enemy movements over own movements
                         //distanceToOtherSideAdvantage -= (log((8 - x + 1).toDouble(),base = 2.14) * 10).toInt()
                     }
                     2 -> { // AI piece (black)
+                        noPiecesOwn = 0
                         //Piece difference
                         pieceDifference += 1  // Each AI piece is good for AI
 
@@ -261,7 +268,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
         //println("Evaluation finished")
 
-        score = (100 * pieceDifference).toInt() + (1 * distanceToOtherSideAdvantage).toInt()
+        score = 50 * pieceDifference + 10 * distanceToOtherSideAdvantage + noPiecesOwn + noPiecesOpponent
 
         //println("Score: $score, individual weights: $pieceDifference, $distanceToOtherSideAdvantage")
 
@@ -299,7 +306,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
     fun printStatistics(){
         println("Nodes explored: $nodesExplored")
-        println("Successfull TT-lookups: $successfullTTlookups")
+        println("Successfull TT-lookups: $successfullTTlookups of which primary: $primaries and secondary: $secondaries")
         println("Collisions: ${Backend.collisions}")
         println("newly Added Entries = ${Backend.newlyAddedEntries - Backend.collisions}")
         println("Adaptive Search depth - #TimesCalled: $adaptiveIterations, Maximum Search Depth achieved: $maxAdaptiveDepth")
@@ -308,6 +315,8 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         Backend.newlyAddedEntries = 0
         adaptiveIterations = 0
         maxAdaptiveDepth = 0
+        Backend.primaries = 0
+        secondaries = 0
     }
 
     private fun successors(board: Array<Array<Int>>, playerID: Int): List<Pair<Array<Array<Int>>, Pair<Point, Point>>> {

@@ -162,63 +162,97 @@ class Board : JComponent() {
         positions: Map<Point, PlayerToMove>,
         maxDepth: Byte,
         timeLimit: Short = 20000  // Time limit in milliseconds
-    ) : Pair<Triple<Point, Point, Map<Point, List<Point>>?>?, Int> {
+    ): Pair<Triple<Point, Point, Map<Point, List<Point>>?>?, Int> {
 
         val alphaBetaEngine = AlphaBetaEngine(pm)
-
-        alphaBetaEngine.nodesExplored = 0  // Reset the node counter
+        alphaBetaEngine.nodesExplored = 0
         alphaBetaEngine.successfullTTlookups = 0
 
         var bestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
         var bestValue = Int.MIN_VALUE
         val tk = TimeKeeper(timeLimit)
-        //val startTime = System.currentTimeMillis()
 
         for (depth in 1..maxDepth) {
-            //val timeElapsed = System.currentTimeMillis() - startTime
-            if (tk.timeUp/**timeElapsed >= timeLimit**/) {
+            if (tk.timeUp) {
                 println("Time limit reached during depth $depth")
                 break
             }
 
-            val (moves, type_of_move) = generateMoves(pm, 2, board, positions)  // AI is player 2 (black)
+            val (moves, type_of_move) = generateMoves(pm, 2, board, positions)
             var currentBestValue = Int.MIN_VALUE
             var currentBestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
 
             // Check if there's only one move and that move has exactly one destination
             if (moves.size == 1 && moves.values.first().size == 1) {
-                // Get the key (fromPosition) and the single destination (toPosition)
                 val fromPosition = moves.keys.first()
                 val toPosition = moves.values.first().first()
-
-                // Set the best move directly
                 bestMove = Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
                 break  // Exit the loop since we found our move
             }
 
             zb.currentBoardHash = zb.calculateInitialHash(board)
 
+            var firstMove = true
             for ((fromPosition, toPositions) in moves) {
                 for (toPosition in toPositions) {
                     val newBoard = copyBoard(board)
                     makeMove(newBoard, fromPosition, toPosition, type_of_move == "Capture")
-                    val newEval = alphaBetaEngine.alphaBetaWithTime(
-                        newBoard,
-                        (depth - 1).toByte(),
-                        Int.MIN_VALUE,
-                        Int.MAX_VALUE,
-                        PlayerToMove.PlayerOne,
-                        tk,
-                        zb.updateHash(zb.currentBoardHash, Pair(fromPosition, toPosition), if (getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2)
+
+                    val hash = zb.updateHash(
+                        zb.currentBoardHash,
+                        Pair(fromPosition, toPosition),
+                        if (getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2
                     )
+
+                    val newEval: Pair<Int, Pair<Point, Point>?> =
+                        if (firstMove) {
+                        // Full window search for the first move
+                        alphaBetaEngine.alphaBetaWithTime(
+                            newBoard,
+                            (depth - 1).toByte(),
+                            Int.MIN_VALUE,
+                            Int.MAX_VALUE,
+                            PlayerToMove.PlayerOne,
+                            tk,
+                            hash
+                        )
+                    } else {
+                        // Null-window search for subsequent moves
+                        val score = alphaBetaEngine.alphaBetaWithTime(
+                            newBoard,
+                            (depth - 1).toByte(),
+                            -currentBestValue,
+                            -currentBestValue + 1,
+                            PlayerToMove.PlayerOne,
+                            tk,
+                            hash
+                        )
+                        // If the move fails high, re-search with full window
+                        if (-score.first > currentBestValue) {
+                            alphaBetaEngine.alphaBetaWithTime(
+                                newBoard,
+                                (depth - 1).toByte(),
+                                Int.MIN_VALUE,
+                                Int.MAX_VALUE,
+                                PlayerToMove.PlayerOne,
+                                tk,
+                                hash
+                            )
+                        } else {
+                            score
+                        }
+                    }
+
                     val eval = -newEval.first
                     if (eval > currentBestValue) {
                         currentBestValue = eval
                         currentBestMove = Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
                     }
+
                     if (alphaBetaEngine.timeUp) {
                         break
                     }
+                    firstMove = false
                 }
                 if (alphaBetaEngine.timeUp) {
                     break
@@ -229,7 +263,6 @@ class Board : JComponent() {
                 bestValue = currentBestValue
                 bestMove = currentBestMove
                 println("Depth $depth completed. Best value: $bestValue")
-
                 HistoryHeuristic.decay()
             } else {
                 println("Time limit reached during depth $depth")
@@ -237,7 +270,6 @@ class Board : JComponent() {
             }
         }
         alphaBetaEngine.printStatistics()
-        // Return the best move found within the time limit
         return Pair(bestMove, alphaBetaEngine.nodesExplored)
     }
 

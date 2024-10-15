@@ -6,6 +6,10 @@ import java.awt.Point
 
 var newlyAddedEntries = 0
 var collisions = 0
+var totalEntries = 0
+
+var primaries = 0
+var secondaries = 0
 
 /**
  * Represents an entry in the transposition table.
@@ -44,52 +48,62 @@ class TableEntry {
 
     /** The depth of the search at which this score was calculated. */
     var searchDepth: Byte = 0
+
+    var age: Byte = 0
 }
 
-/**
- * Represents a node in a linked list within a hash table bucket.
- *
- * Used to handle collisions in the hash table by chaining entries with the same bucket index.
- */
-class BucketItem(
-    /** The table entry stored in this bucket item. */
-    val entry: TableEntry,
-    /** The next bucket item in the linked list. */
-    var next: BucketItem? = null
-) {
+class BucketItem {
+    /** Primary and Secondary entries in the bucket */
+    var primaryEntry: TableEntry? = null
+    var secondaryEntry: TableEntry? = null
+
     /**
-     * Recursively searches for an entry with the matching hash value in the linked list.
+     * Retrieves an entry from the bucket based on the hash value.
      *
      * @param hashValue The Zobrist hash value to search for.
-     * @return The matching `TableEntry` if found; otherwise, `null`.
+     * @return The corresponding `TableEntry` if found; otherwise, `null`.
      */
-    fun getElement(hashValue: ULong): TableEntry? {
-        return if (entry.hashValue == hashValue) {
-            entry
-        } else {
-            next?.getElement(hashValue)
+    fun getEntry(hashValue: ULong): TableEntry? {
+        if (primaryEntry?.hashValue == hashValue) {
+            primaries++
+            return primaryEntry
+        } else if (secondaryEntry?.hashValue == hashValue) {
+            secondaries++
+            return secondaryEntry
         }
+        return null
     }
 
     /**
      * Adds a new entry to the linked list or replaces an existing entry with the same hash value.
-     *
+     * TWO-DEEP Replacement SCHEME
      * @param newEntry The new `TableEntry` to add.
      */
-    fun addOrReplaceEntry(newEntry: TableEntry) {
-        if (entry.hashValue == newEntry.hashValue) {
+    fun storeEntry(newEntry: TableEntry) {
+        if (primaryEntry == null) {
+            newlyAddedEntries++
+            // No primary entry; store here
+            primaryEntry = newEntry
+        } else if (primaryEntry!!.hashValue == newEntry.hashValue) {
+            // Replace existing primary entry with the same hash
+            newlyAddedEntries++
+            primaryEntry = newEntry
+        } else if (newEntry.searchDepth >= primaryEntry!!.searchDepth) {
+            // Shift primary to secondary and store new entry as primary
+            newlyAddedEntries++
+            secondaryEntry = primaryEntry
+            primaryEntry = newEntry
+        } else if (secondaryEntry == null || secondaryEntry!!.hashValue == newEntry.hashValue) {
+            // Store in secondary slot
+            newlyAddedEntries++
+            secondaryEntry = newEntry
+        } else if (newEntry.searchDepth >= secondaryEntry!!.searchDepth) {
+            // Replace secondary entry
+            newlyAddedEntries++
+            secondaryEntry = newEntry
+        }
+        else{
             collisions++
-            // Replace the existing entry
-            entry.score = newEntry.score
-            entry.scoreType = newEntry.scoreType
-            entry.bestMove = newEntry.bestMove
-            entry.searchDepth = newEntry.searchDepth
-        } else {
-            if (next == null) {
-                next = BucketItem(newEntry)
-            } else {
-                next!!.addOrReplaceEntry(newEntry)
-            }
         }
     }
 
@@ -97,8 +111,8 @@ class BucketItem(
      * Clears the linked list starting from this bucket item.
      */
     fun clear() {
-        next?.clear()
-        next = null
+        primaryEntry = null
+        secondaryEntry = null
     }
 }
 
@@ -128,7 +142,6 @@ class TranspositionTable {
      * @param entry The `TableEntry` to store.
      */
     fun storeEntry(entry: TableEntry) {
-        newlyAddedEntries++
         hashArray.storeEntry(entry)
     }
 
@@ -160,7 +173,7 @@ class HashArray {
         val index = (hashValue % MAX_BUCKETS.toUInt()).toInt()
         //println("hash array Lookup for index: $index")
         val bucket = buckets[index]
-        return bucket?.getElement(hashValue)
+        return bucket?.getEntry(hashValue)
     }
 
     /**
@@ -174,11 +187,13 @@ class HashArray {
         val index = (entry.hashValue % MAX_BUCKETS.toUInt()).toInt()
         val bucket = buckets[index]
         if (bucket == null) {
-            // No collision; place the entry directly
-            buckets[index] = BucketItem(entry)
+            // No collision; create a new bucket
+            val newBucket = BucketItem()
+            newBucket.storeEntry(entry)
+            buckets[index] = newBucket
         } else {
-            // Collision; add or replace the entry in the linked list
-            bucket.addOrReplaceEntry(entry)
+            // Use the Two Deep Replacement Scheme to store the entry
+            bucket.storeEntry(entry)
         }
     }
 
