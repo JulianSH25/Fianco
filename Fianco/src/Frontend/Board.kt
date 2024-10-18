@@ -101,7 +101,7 @@ class Board : JComponent() {
 
 
     fun aiMove() {
-        println("AI MOVE - thinking!")
+        //println("AI MOVE - thinking!")
         val aiWorker = object : SwingWorker<Unit, Unit>() {
             var nodesExplored = 0
 

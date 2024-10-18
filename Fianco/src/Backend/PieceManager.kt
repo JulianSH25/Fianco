@@ -1,7 +1,6 @@
 package Backend
 
 import java.awt.Point
-import Backend.PlayerToMove
 
 class PieceManager {
     private val pieceArray: Array<Array<Int>> = Array(9) { Array(9) { 0 } }
@@ -39,10 +38,5 @@ class PieceManager {
     // Get a copy of the current board
     fun getBoardCopy(): Array<Array<Int>> {
         return pieceArray.map { it.copyOf() }.toTypedArray()
-    }
-
-    // Initialize the board
-    fun initializeBoard() {
-        // Implement your board initialization logic here
     }
 }

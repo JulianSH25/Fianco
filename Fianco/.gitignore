@@ -30,6 +30,3 @@ bin/
 
 ### Mac OS ###
 .DS_Store
-
-###""" only used for testing, no need to upload:"""
-src/Backend/TT_test.kt

@@ -236,8 +236,8 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
         val pieceDifferenceWeight = 0.5
         val distanceWeight = 0.5
-        var noPiecesOpponent = Int.MAX_VALUE
-        var noPiecesOwn = Int.MIN_VALUE
+        var noPiecesOpponent = (Short.MAX_VALUE).toInt()
+        var noPiecesOwn = (Short.MIN_VALUE).toInt()
 
         for (x in board.indices) {
             for (y in board[x].indices) {
