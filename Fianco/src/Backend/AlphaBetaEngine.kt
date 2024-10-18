@@ -76,7 +76,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
         if (timeObject.timeUp) {
             timeUp = true
-            return Pair(0, null)  // Return a neutral value since time is up
+            return Pair(0, null)  // Return a neutral value since // time is up
         }
 
         if (checkTerminal(board)) {
@@ -84,7 +84,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             return when {
                 winner == null -> Pair(0, null)  // Draw
                 (winner == PlayerToMove.PlayerTwo && playerMultiplier == 1) ||
-                (winner == PlayerToMove.PlayerOne && playerMultiplier == -1) -> Pair(Int.MAX_VALUE - depth, null)
+                (winner == PlayerToMove.PlayerOne && playerMultiplier == -1) -> Pair(Int.MAX_VALUE, null)
                 else -> Pair(Int.MIN_VALUE + depth, null)
             }
         } else if (depth == 0.toByte()) {
@@ -99,8 +99,13 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
             // Adaptive Search Depth check:
             if (adaptiveFlag == true || contWithAdaptiveDepth == false){
-                //println("exciting node, returning eval value")
-                return Pair(evaluationScore, null)  // do not continue with increase search depth
+                if (isQuiescentPosition(pm, board, player)){
+                    return Pair(evaluationScore, null)  // do not continue with increase search depth
+                }
+                else{
+                    depth++
+                    adaptiveFlag = true
+                }
             }
             else{
                 adaptiveFlag = true  // set the flag to true as to continue the search below. Depth to nominal increased search depth (added)

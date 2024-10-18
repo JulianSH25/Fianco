@@ -44,6 +44,27 @@ fun checkVictory(pm: PieceManager, pieceArray: Array<Array<Int>> = pm.getBoardCo
     return null // No winner yet
 }
 
+fun generateTacticalMoves(
+    pm: PieceManager,
+    playerID: Int,
+    board: Array<Array<Int>>,
+    positions: Map<Point, PlayerToMove>
+): Pair<Map<Point, List<Point>>, String> {
+    val player = if (playerID == 1) PlayerToMove.PlayerOne else PlayerToMove.PlayerTwo
+    val captureMoves = checkCapture(pm, positions, player, pieceArray = board)
+    return if (captureMoves != null) Pair(captureMoves, "Capture") else Pair(emptyMap(), "NoCapture")
+}
+
+fun isQuiescentPosition(
+    pm: PieceManager,
+    board: Array<Array<Int>>,
+    player: PlayerToMove
+): Boolean {
+    val piecePositions = createPiecePositionsFromBoard(board)
+    val captures = checkCapture(pm, piecePositions, player, pieceArray = board)
+    return captures == null  // If no captures are available, the position is quiescent
+}
+
 fun checkCapture(
     pm: PieceManager,
     piecePositions: Map<Point, PlayerToMove> = pm.piecePositions,
