@@ -139,7 +139,7 @@ class BucketItem {
 class HashArray {
     companion object {
         /** The number of buckets in the hash table. */
-        const val MAX_BUCKETS: UInt = 1024000u
+        const val MAX_BUCKETS: UInt = 536870912u
     }
 
     private val buckets: Array<BucketItem?> = arrayOfNulls(MAX_BUCKETS.toInt())

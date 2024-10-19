@@ -6,8 +6,6 @@ import javax.swing.border.LineBorder
 import Backend.PlayerTypes
 import java.io.OutputStream
 import java.io.PrintStream
-import javax.swing.text.BadLocationException
-import javax.swing.text.StyleConstants
 
 /**
  * The main GUI class for the Fianco game.

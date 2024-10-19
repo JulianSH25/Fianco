@@ -17,7 +17,6 @@ import java.awt.event.*
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 import javax.swing.*
-import javax.swing.border.LineBorder
 import javax.swing.text.BadLocationException
 import javax.swing.text.StyleConstants
 

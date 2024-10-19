@@ -57,26 +57,6 @@ fun checkVictory(pm: PieceManager, pieceArray: Array<Array<Int>> = pm.getBoardCo
 }
 
 /**
- * Generates tactical moves (captures) for the given player.
- *
- * @param pm The PieceManager instance.
- * @param playerID The player's ID (1 or 2).
- * @param board The game board array.
- * @param positions The positions of the pieces.
- * @return A Pair containing the capture moves and a String indicating "Capture" or "NoCapture".
- */
-fun generateTacticalMoves(
-    pm: PieceManager,
-    playerID: Int,
-    board: Array<Array<Int>>,
-    positions: Map<Point, PlayerToMove>
-): Pair<Map<Point, List<Point>>, String> {
-    val player = if (playerID == 1) PlayerToMove.PlayerOne else PlayerToMove.PlayerTwo
-    val captureMoves = checkCapture(pm, positions, player, pieceArray = board)
-    return if (captureMoves != null) Pair(captureMoves, "Capture") else Pair(emptyMap(), "NoCapture")
-}
-
-/**
  * Determines if a position is quiescent (i.e., no captures are possible).
  *
  * @param pm The PieceManager instance.

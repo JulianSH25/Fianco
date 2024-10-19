@@ -2,9 +2,6 @@ package Backend
 
 import java.awt.Point
 import java.io.IOException
-import kotlin.random.Random
-import Backend.PlayerToMove
-import Backend.PieceManager
 import Backend.UtilityFunctions.isValidMove
 
 /**

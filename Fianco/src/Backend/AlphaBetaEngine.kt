@@ -2,12 +2,10 @@ package Backend
 
 import Backend.UtilityFunctions.*
 import java.awt.Point
-import java.io.Serializable
 
 import kotlin.collections.List
 import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.math.log
 import kotlin.math.max
 import kotlin.math.min
 import Backend.Utilities.TimeKeeper
@@ -152,7 +150,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         for (move in sortedMoves) {
             val (from, to) = move
             val newBoard = copyBoard(board)
-            makeMove(newBoard, from, to, /* isCapture = */ true)  // Adjust if necessary
+            makeMove(newBoard, from, to, /* isCapture = */ true)
             val newHash = zb.updateHash(
                 zobrHash,
                 move,
