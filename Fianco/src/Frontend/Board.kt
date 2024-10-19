@@ -1,37 +1,40 @@
 package Frontend
 
+import Backend.Player
+import Backend.PlayerTypes
+import Backend.PlayerToMove
 import Backend.AlphaBetaEngine
 import Backend.HistoryHeuristic
 import Backend.PieceManager
-import Backend.Player.getPlayerToMove
-import Backend.UtilityFunctions.*
+import Backend.RandomEngine
 import Backend.generateMoves
+import Backend.Utilities.TimeKeeper
+import Backend.UtilityFunctions.*
+import Backend.Zobrist
 import Backend.makeMove
-
-import javax.swing.SwingWorker
-import javax.swing.SwingUtilities
 import java.awt.*
 import java.awt.event.*
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 import javax.swing.*
 import javax.swing.border.LineBorder
-import Backend.PlayerTypes
-import Backend.PlayerToMove
-import Backend.RandomEngine
-import Backend.Zobrist
-import TimeKeeper
 import javax.swing.text.BadLocationException
 import javax.swing.text.StyleConstants
-import Backend.Player as player
 
+/**
+ * Represents the game board and handles user interactions and game logic.
+ *
+ * @param gui Reference to the main GUI.
+ */
 class Board(private val gui: FiancoGUI) : JComponent() {
 
+    // Piece Manager to manage game pieces
     private val pm = PieceManager()
     private val zb = Zobrist()
 
     private var selectedPiece: Point? = null
 
+    // Images for the pawns
     private val redPawnImage: BufferedImage? = ImageIO.read(javaClass.getResource("figures/whitePawn.png"))
     private val blackPawnImage: BufferedImage? = ImageIO.read(javaClass.getResource("figures/blackPawn.png"))
 
@@ -41,16 +44,14 @@ class Board(private val gui: FiancoGUI) : JComponent() {
     private var gameEnded = false
 
     init {
-        // Initialize the board
-        //initializeBoard()
-
         // Mouse listener for human moves
         addMouseListener(object : MouseAdapter() {
             override fun mousePressed(e: MouseEvent) {
                 if (gameEnded) return
 
-                if ((playerOne == PlayerTypes.HUMAN && player.getPlayerToMove() == PlayerToMove.PlayerOne) ||
-                    (playerTwo == PlayerTypes.HUMAN && player.getPlayerToMove() == PlayerToMove.PlayerTwo)
+                val currentPlayer = Player.getPlayerToMove()
+                if ((playerOne == PlayerTypes.HUMAN && currentPlayer == PlayerToMove.PlayerOne) ||
+                    (playerTwo == PlayerTypes.HUMAN && currentPlayer == PlayerToMove.PlayerTwo)
                 ) {
 
                     val currentSquareSize = minOf(width / 9, height / 9)
@@ -58,7 +59,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
                     val column = e.x / currentSquareSize
                     val position = Point(row, column)
 
-                    if (position in pm.piecePositions && pm.piecePositions[position] == player.getPlayerToMove()) {
+                    if (position in pm.piecePositions && pm.piecePositions[position] == currentPlayer) {
                         selectedPiece = position
                     }
                 }
@@ -81,6 +82,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
             }
         })
 
+        // Listener to repaint when the component is resized
         addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent?) {
                 repaint()
@@ -88,6 +90,11 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         })
     }
 
+    /**
+     * Checks if there is a winner or if the game has ended due to stalemate or no pieces.
+     *
+     * @return True if the game has ended; False otherwise.
+     */
     fun checkForWinner(): Boolean {
         val winner = checkVictory(pm)
         if (winner != null) {
@@ -96,27 +103,73 @@ class Board(private val gui: FiancoGUI) : JComponent() {
             endGame()
             return true
         }
+
+        // Check if the current player has no pieces left
+        val currentPlayer = Player.getPlayerToMove()
+        val currentPlayerPieces = pm.piecePositions.filterValues { it == currentPlayer }
+        if (currentPlayerPieces.isEmpty()) {
+            val message = "Player ${if (currentPlayer == PlayerToMove.PlayerOne) "White" else "Black"} has no pieces left! They lose."
+            JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
+            endGame()
+            return true
+        }
+
+        // Check if the current player cannot make a move (stalemate)
+        val boardCopy = pm.getBoardCopy()
+        val positionsCopy = createPiecePositionsFromBoard(boardCopy)
+        val currentPlayerID = if (currentPlayer == PlayerToMove.PlayerOne) 1 else 2
+        val (moves, _) = try {
+            generateMoves(pm, currentPlayerID, boardCopy, positionsCopy)
+        } catch (e: Exception) {
+            Pair(emptyMap<Point, List<Point>>(), "")
+        }
+        if (moves.isEmpty()) {
+            val message = "Player ${if (currentPlayer == PlayerToMove.PlayerOne) "White" else "Black"} cannot make a move! They lose."
+            JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
+            endGame()
+            return true
+        }
+
         return false
     }
 
+    /**
+     * Sets the player type for Player One.
+     *
+     * @param type The player type (HUMAN, AI_ENGINE, RANDOM_ENGINE).
+     */
     fun setPlayerOneType(type: PlayerTypes) {
         playerOne = type
     }
 
+    /**
+     * Sets the player type for Player Two.
+     *
+     * @param type The player type (HUMAN, AI_ENGINE, RANDOM_ENGINE).
+     */
     fun setPlayerTwoType(type: PlayerTypes) {
         playerTwo = type
     }
 
+    /**
+     * Sets both players' types and updates the Player object.
+     *
+     * @param p1 Player One's type.
+     * @param p2 Player Two's type.
+     */
     fun setPlayers(p1: PlayerTypes, p2: PlayerTypes) {
         playerOne = p1
         playerTwo = p2
-        player.setPlayers(playerOne, playerTwo)
+        Player.setPlayers(playerOne, playerTwo)
     }
 
+    /**
+     * Initializes the board with the starting positions.
+     */
     fun initializeBoard() {
         gameEnded = false
         pm.reset()
-        player.setPlayerToMove(PlayerToMove.PlayerOne)
+        Player.setPlayerToMove(PlayerToMove.PlayerOne)
 
         // Initialize the board pieces
         // Place Player One's pieces (value 1)
@@ -139,14 +192,17 @@ class Board(private val gui: FiancoGUI) : JComponent() {
 
         // Update the GUI
         repaint()
-        gui.updateCurrentPlayerLabel(player.getPlayerToMove().name)
+        gui.updateCurrentPlayerLabel(Player.getPlayerToMove().name)
         gui.getClock().reset()
     }
 
+    /**
+     * Checks if AI needs to make a move and starts the AI move if necessary.
+     */
     fun checkAndStartAI() {
         if (gameEnded) return
 
-        val currentPlayer = player.getPlayerToMove()
+        val currentPlayer = Player.getPlayerToMove()
         val currentPlayerType = if (currentPlayer == PlayerToMove.PlayerOne) playerOne else playerTwo
 
         if (currentPlayerType == PlayerTypes.AI_ENGINE) {
@@ -160,18 +216,24 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         gui.updateCurrentPlayerLabel(currentPlayer.name)
     }
 
+    /**
+     * Ends the game and stops the clock.
+     */
     fun endGame() {
         gameEnded = true
         gui.getClock().stop()
     }
 
+    /**
+     * Makes a move using the RandomEngine for AI.
+     */
     fun aiRandomMove() {
         println("AI MOVE - picking random move!")
         val aiWorker = object : SwingWorker<Void, Void>() {
             override fun doInBackground(): Void? {
                 val boardCopy = pm.getBoardCopy()
                 val positionsCopy = createPiecePositionsFromBoard(boardCopy)
-                val currentPlayerID = if (player.getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2
+                val currentPlayerID = if (Player.getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2
                 val (moves, typeOfMove) = generateMoves(pm, currentPlayerID, boardCopy, positionsCopy)
                 if (moves.isNotEmpty()) {
                     val randomEngine = RandomEngine()
@@ -189,8 +251,11 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         aiWorker.execute()
     }
 
+    /**
+     * Makes a move using the AlphaBetaEngine for AI.
+     */
     fun aiMove() {
-        println("AlphaBeta MOVE generation invoked for player: ${getPlayerToMove()} (${if (getPlayerToMove() == PlayerToMove.PlayerOne) "White" else "Black"})!")
+        println("AlphaBeta MOVE generation invoked for player: ${Player.getPlayerToMove()} (${if (Player.getPlayerToMove() == PlayerToMove.PlayerOne) "White" else "Black"})!")
         val aiWorker = object : SwingWorker<Void, Void>() {
             var nodesExplored = 0
 
@@ -215,6 +280,15 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         aiWorker.execute()
     }
 
+    /**
+     * Gets the best move for the AI using iterative deepening and alpha-beta pruning.
+     *
+     * @param board The current board state.
+     * @param positions The positions of the pieces.
+     * @param maxDepth The maximum depth to search.
+     * @param timeLimit The time limit in milliseconds.
+     * @return A Pair containing the best move and the number of nodes explored.
+     */
     fun getBestMove(
         board: Array<Array<Int>>,
         positions: Map<Point, PlayerToMove>,
@@ -230,7 +304,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         var bestValue = Int.MIN_VALUE
         val tk = TimeKeeper(timeLimit)
 
-        val currentPlayer = getPlayerToMove()
+        val currentPlayer = Player.getPlayerToMove()
 
         for (depth in 1..maxDepth) {
             if (tk.timeUp) {
@@ -275,7 +349,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
                                 (depth - 1).toByte(),
                                 Int.MIN_VALUE,
                                 Int.MAX_VALUE,
-                                if (currentPlayer == PlayerToMove.PlayerOne) PlayerToMove.PlayerTwo else PlayerToMove.PlayerOne,
+                                Player.getOtherPlayer(currentPlayer),
                                 tk,
                                 hash
                             )
@@ -285,7 +359,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
                                 (depth - 1).toByte(),
                                 -currentBestValue,
                                 -currentBestValue + 1,
-                                if (currentPlayer == PlayerToMove.PlayerOne) PlayerToMove.PlayerTwo else PlayerToMove.PlayerOne,
+                                Player.getOtherPlayer(currentPlayer),
                                 tk,
                                 hash
                             )
@@ -295,7 +369,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
                                     (depth - 1).toByte(),
                                     Int.MIN_VALUE,
                                     Int.MAX_VALUE,
-                                    if (currentPlayer == PlayerToMove.PlayerOne) PlayerToMove.PlayerTwo else PlayerToMove.PlayerOne,
+                                    Player.getOtherPlayer(currentPlayer),
                                     tk,
                                     hash
                                 )
@@ -335,6 +409,13 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         return Pair(bestMove, alphaBetaEngine.nodesExplored)
     }
 
+    /**
+     * Handles the AI's move on the board.
+     *
+     * @param oldPosition The starting position of the move.
+     * @param newPosition The destination position of the move.
+     * @param captureMap The map of capture moves if applicable.
+     */
     fun handleMoveAI(oldPosition: Point, newPosition: Point, captureMap: Map<Point, List<Point>>? = null) {
         if (gameEnded) return
 
@@ -344,27 +425,34 @@ class Board(private val gui: FiancoGUI) : JComponent() {
             pm.movePiece(oldPosition, newPosition)
         }
 
-        updateMoveHistory(oldPosition, newPosition, player.getPlayerToMove())
+        updateMoveHistory(oldPosition, newPosition, Player.getPlayerToMove())
 
         // Switch player
-        player.switchPlayerToMove()
+        Player.switchPlayerToMove()
         repaint()
 
-        gui.updateCurrentPlayerLabel(player.getPlayerToMove().name)
-        gui.getClock().switchPlayer(player.getPlayerToMove())
+        gui.updateCurrentPlayerLabel(Player.getPlayerToMove().name)
+        gui.getClock().switchPlayer(Player.getPlayerToMove())
 
         if (!checkForWinner()) {
             checkAndStartAI()
         }
     }
 
+    /**
+     * Handles a human player's move.
+     *
+     * @param oldPosition The starting position of the move.
+     * @param newPosition The destination position of the move.
+     * @return True if the move was successful; False otherwise.
+     */
     fun handleMove(oldPosition: Point, newPosition: Point): Boolean {
         val (validMove, captureMap) = isValidMove(
             pm,
             oldPosition,
             newPosition,
             pm.piecePositions,
-            player.getPlayerToMove()
+            Player.getPlayerToMove()
         )
 
         if (validMove) {
@@ -390,14 +478,14 @@ class Board(private val gui: FiancoGUI) : JComponent() {
                 println("Moved manually from $oldPosition to ${newPosition.x + dx}, ${newPosition.y} and removed piece at $capturedX, $capturedY")
             }
 
-            updateMoveHistory(oldPosition, newPosition, player.getPlayerToMove())
+            updateMoveHistory(oldPosition, newPosition, Player.getPlayerToMove())
 
             // Switch player
-            player.switchPlayerToMove()
+            Player.switchPlayerToMove()
             repaint()
 
-            gui.updateCurrentPlayerLabel(player.getPlayerToMove().name)
-            gui.getClock().switchPlayer(player.getPlayerToMove())
+            gui.updateCurrentPlayerLabel(Player.getPlayerToMove().name)
+            gui.getClock().switchPlayer(Player.getPlayerToMove())
 
             return !checkForWinner()
         } else {
@@ -406,12 +494,24 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         }
     }
 
+    /**
+     * Converts a Point to chess notation.
+     *
+     * @return The position in chess notation (e.g., "A1").
+     */
     fun Point.toChessNotation(): String {
         val columnChar = ('A' + this.y)
         val rowNumber = 9 - this.x
         return "$columnChar$rowNumber"
     }
 
+    /**
+     * Updates the move history displayed in the GUI.
+     *
+     * @param from The starting position of the move.
+     * @param to The destination position of the move.
+     * @param player The player who made the move.
+     */
     fun updateMoveHistory(from: Point, to: Point, player: PlayerToMove) {
         val moveString = "${player.name}: ${from.toChessNotation()} -> ${to.toChessNotation()}\n"
         val doc = gui.getMoveHistoryArea().styledDocument
@@ -424,6 +524,11 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         }
     }
 
+    /**
+     * Paints the game board and pieces.
+     *
+     * @param g The Graphics object.
+     */
     override fun paintComponent(g: Graphics) {
         super.paintComponent(g)
         val g2d = g as Graphics2D
@@ -435,7 +540,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         val boardSize = minOf(width, height)
         val squareSize = boardSize / 9
 
-        // Draw the board squares
+        // Draw the board squares and pieces
         for (row in 0 until 9) {
             for (column in 0 until 9) {
                 val x = column * squareSize
@@ -489,6 +594,11 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         }
     }
 
+    /**
+     * Gets the preferred size of the component.
+     *
+     * @return The preferred Dimension.
+     */
     override fun getPreferredSize(): Dimension {
         val size = minOf(parent.width, parent.height)
         return Dimension(size, size)
