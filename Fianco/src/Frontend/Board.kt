@@ -3,8 +3,8 @@ package Frontend
 import Backend.AlphaBetaEngine
 import Backend.HistoryHeuristic
 import Backend.PieceManager
+import Backend.Player.getPlayerToMove
 import Backend.UtilityFunctions.*
-import Backend.UtilityFunctions.createPiecePositionsFromBoard
 import Backend.generateMoves
 import Backend.makeMove
 
@@ -17,71 +17,48 @@ import javax.imageio.ImageIO
 import javax.swing.*
 import javax.swing.border.LineBorder
 import Backend.PlayerTypes
-import Backend.Player.setPlayers
-import Backend.Player.getPlayerToMove
 import Backend.PlayerToMove
 import Backend.RandomEngine
 import Backend.Zobrist
 import TimeKeeper
+import javax.swing.text.BadLocationException
+import javax.swing.text.StyleConstants
 import Backend.Player as player
 
-class Board : JComponent() {
+class Board(private val gui: FiancoGUI) : JComponent() {
 
-    private val AIstarting = false
     private val pm = PieceManager()
     private val zb = Zobrist()
 
-    private var initialiseAI = true
-
-    // Set both players to AI_ENGINE for AI vs AI games
-    private val playerOne = PlayerTypes.RANDOM_ENGINE
-    private val playerTwo = PlayerTypes.AI_ENGINE
-
     private var selectedPiece: Point? = null
 
-    private val messageLabel = JLabel()
-    private val infoLabel = JLabel()
-    private val redPawnImage: BufferedImage? = ImageIO.read(if (AIstarting) javaClass.getResource("figures/blackPawn.png") else javaClass.getResource("figures/whitePawn.png"))
-    private val blackPawnImage: BufferedImage? = ImageIO.read(if (AIstarting) javaClass.getResource("figures/whitePawn.png") else javaClass.getResource("figures/blackPawn.png"))
+    private val redPawnImage: BufferedImage? = ImageIO.read(javaClass.getResource("figures/whitePawn.png"))
+    private val blackPawnImage: BufferedImage? = ImageIO.read(javaClass.getResource("figures/blackPawn.png"))
+
+    private var playerOne = PlayerTypes.HUMAN
+    private var playerTwo = PlayerTypes.AI_ENGINE
+
+    private var gameEnded = false
 
     init {
-        infoLabel.font = infoLabel.font.deriveFont(Font.PLAIN, 14f)
-        infoLabel.border = LineBorder(Color.BLACK)
-        infoLabel.horizontalAlignment = JLabel.CENTER
-        infoLabel.isOpaque = true
-        add(infoLabel, BorderLayout.NORTH)
+        // Initialize the board
+        //initializeBoard()
 
-        messageLabel.font = messageLabel.font.deriveFont(Font.BOLD)
-        messageLabel.border = LineBorder(Color.BLACK)
-        messageLabel.horizontalAlignment = JLabel.CENTER
-        messageLabel.isOpaque = true
-        add(messageLabel, BorderLayout.SOUTH)
-
-        setPlayers(playerOne, playerTwo)
-
-        initializeBoard()
-
-        // If the current player is AI, start the AI move
-        if (getPlayerToMove() == PlayerToMove.PlayerOne) {
-            if (playerOne == PlayerTypes.AI_ENGINE){
-                aiMove()
-            }
-            else if (playerOne == PlayerTypes.RANDOM_ENGINE){
-                aiRandomMove()
-            }
-        }
-
-        // Ensure only one argument is passed to addMouseListener
+        // Mouse listener for human moves
         addMouseListener(object : MouseAdapter() {
             override fun mousePressed(e: MouseEvent) {
-                if ((playerOne == PlayerTypes.HUMAN && getPlayerToMove() == PlayerToMove.PlayerOne) ||
-                    (playerTwo == PlayerTypes.HUMAN && getPlayerToMove() == PlayerToMove.PlayerTwo)) {
+                if (gameEnded) return
 
-                    val row = e.y / Constants.SQUARE_SIZE
-                    val column = e.x / Constants.SQUARE_SIZE
+                if ((playerOne == PlayerTypes.HUMAN && player.getPlayerToMove() == PlayerToMove.PlayerOne) ||
+                    (playerTwo == PlayerTypes.HUMAN && player.getPlayerToMove() == PlayerToMove.PlayerTwo)
+                ) {
+
+                    val currentSquareSize = minOf(width / 9, height / 9)
+                    val row = e.y / currentSquareSize
+                    val column = e.x / currentSquareSize
                     val position = Point(row, column)
 
-                    if (position in pm.piecePositions && pm.piecePositions[position] == getPlayerToMove()) {
+                    if (position in pm.piecePositions && pm.piecePositions[position] == player.getPlayerToMove()) {
                         selectedPiece = position
                     }
                 }
@@ -89,21 +66,14 @@ class Board : JComponent() {
 
             override fun mouseReleased(e: MouseEvent) {
                 if (selectedPiece != null) {
-                    val newRow = e.y / Constants.SQUARE_SIZE
-                    val newColumn = e.x / Constants.SQUARE_SIZE
+                    val currentSquareSize = minOf(width / 9, height / 9)
+                    val newRow = e.y / currentSquareSize
+                    val newColumn = e.x / currentSquareSize
                     val newPosition = Point(newRow, newColumn)
 
-                    if (handleMove(selectedPiece!!, newPosition) && initialiseAI) {
+                    if (handleMove(selectedPiece!!, newPosition)) {
                         selectedPiece = null
-                        // If the next player is AI, start the AI move
-                        if ((getPlayerToMove() == PlayerToMove.PlayerOne && playerOne == PlayerTypes.AI_ENGINE) ||
-                            (getPlayerToMove() == PlayerToMove.PlayerTwo && playerTwo == PlayerTypes.AI_ENGINE)) {
-                            aiMove()
-                        }
-                        else if ((getPlayerToMove() == PlayerToMove.PlayerOne && playerOne == PlayerTypes.RANDOM_ENGINE) ||
-                            (getPlayerToMove() == PlayerToMove.PlayerTwo && playerTwo == PlayerTypes.RANDOM_ENGINE)) {
-                            aiRandomMove()
-                        }
+                        checkAndStartAI()
                     } else {
                         selectedPiece = null
                     }
@@ -118,20 +88,96 @@ class Board : JComponent() {
         })
     }
 
+    fun checkForWinner(): Boolean {
+        val winner = checkVictory(pm)
+        if (winner != null) {
+            val message: String = if (winner == PlayerToMove.PlayerOne) "White Won!" else "Black Won!"
+            JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
+            endGame()
+            return true
+        }
+        return false
+    }
+
+    fun setPlayerOneType(type: PlayerTypes) {
+        playerOne = type
+    }
+
+    fun setPlayerTwoType(type: PlayerTypes) {
+        playerTwo = type
+    }
+
+    fun setPlayers(p1: PlayerTypes, p2: PlayerTypes) {
+        playerOne = p1
+        playerTwo = p2
+        player.setPlayers(playerOne, playerTwo)
+    }
+
+    fun initializeBoard() {
+        gameEnded = false
+        pm.reset()
+        player.setPlayerToMove(PlayerToMove.PlayerOne)
+
+        // Initialize the board pieces
+        // Place Player One's pieces (value 1)
+        for (i in 0 until 9) {
+            pm.setPiece(8, i, 1)
+        }
+        for (i in 1 until 4) {
+            pm.setPiece(8 - i, i, 1)
+            pm.setPiece(8 - i, 8 - i, 1)
+        }
+
+        // Place Player Two's pieces (value 2)
+        for (i in 0 until 9) {
+            pm.setPiece(0, i, 2)
+        }
+        for (i in 1 until 4) {
+            pm.setPiece(i, i, 2)
+            pm.setPiece(i, 8 - i, 2)
+        }
+
+        // Update the GUI
+        repaint()
+        gui.updateCurrentPlayerLabel(player.getPlayerToMove().name)
+        gui.getClock().reset()
+    }
+
+    fun checkAndStartAI() {
+        if (gameEnded) return
+
+        val currentPlayer = player.getPlayerToMove()
+        val currentPlayerType = if (currentPlayer == PlayerToMove.PlayerOne) playerOne else playerTwo
+
+        if (currentPlayerType == PlayerTypes.AI_ENGINE) {
+            aiMove()
+        } else if (currentPlayerType == PlayerTypes.RANDOM_ENGINE) {
+            aiRandomMove()
+        }
+
+        // Update the clock's current player
+        gui.getClock().switchPlayer(currentPlayer)
+        gui.updateCurrentPlayerLabel(currentPlayer.name)
+    }
+
+    fun endGame() {
+        gameEnded = true
+        gui.getClock().stop()
+    }
+
     fun aiRandomMove() {
         println("AI MOVE - picking random move!")
         val aiWorker = object : SwingWorker<Void, Void>() {
             override fun doInBackground(): Void? {
                 val boardCopy = pm.getBoardCopy()
                 val positionsCopy = createPiecePositionsFromBoard(boardCopy)
-                val currentPlayerID = if (getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2
+                val currentPlayerID = if (player.getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2
                 val (moves, typeOfMove) = generateMoves(pm, currentPlayerID, boardCopy, positionsCopy)
                 if (moves.isNotEmpty()) {
                     val randomEngine = RandomEngine()
                     val (fromPosition, toPosition) = randomEngine.pickRandomMove(moves)
                     SwingUtilities.invokeLater {
                         handleMoveAI(fromPosition, toPosition, if (typeOfMove == "Capture") moves else null)
-                        repaint()
                         checkForWinner()
                     }
                 } else {
@@ -139,18 +185,12 @@ class Board : JComponent() {
                 }
                 return null
             }
-
-            override fun done() {
-                SwingUtilities.invokeLater {
-                    infoLabel.text = "Random AI made a move."
-                }
-            }
         }
         aiWorker.execute()
     }
 
     fun aiMove() {
-        println("AI MOVE - thinking!")
+        println("AlphaBeta MOVE generation invoked for player: ${getPlayerToMove()} (${if (getPlayerToMove() == PlayerToMove.PlayerOne) "White" else "Black"})!")
         val aiWorker = object : SwingWorker<Void, Void>() {
             var nodesExplored = 0
 
@@ -164,7 +204,6 @@ class Board : JComponent() {
                 if (bestMove != null) {
                     SwingUtilities.invokeLater {
                         handleMoveAI(bestMove.first, bestMove.second, bestMove.third)
-                        repaint()
                         checkForWinner()
                     }
                 } else {
@@ -172,35 +211,8 @@ class Board : JComponent() {
                 }
                 return null
             }
-
-            override fun done() {
-                SwingUtilities.invokeLater {
-                    infoLabel.text = "Nodes explored: $nodesExplored | Depth: variable (iterative deepening)"
-                }
-            }
         }
         aiWorker.execute()
-    }
-
-    private fun initializeBoard() {
-        for (i in 0 until 9) {
-            pm.setPiece(8, i, 1)
-            if (AIstarting && i < 8) {
-                pm.setPiece(0, i, 2)
-            } else if (!AIstarting) {
-                pm.setPiece(0, i, 2)
-            }
-        }
-        if (AIstarting) {
-            pm.setPiece(1, 8, 2)
-        }
-        for (i in 1 until 4) {
-            pm.setPiece(8 - i, i, 1)
-            pm.setPiece(i, i, 2)
-
-            pm.setPiece(i, 8 - i, 2)
-            pm.setPiece(8 - i, 8 - i, 1)
-        }
     }
 
     fun getBestMove(
@@ -226,7 +238,12 @@ class Board : JComponent() {
                 break
             }
 
-            val (moves, type_of_move) = generateMoves(pm, if (currentPlayer == PlayerToMove.PlayerOne) 1 else 2, board, positions)
+            val (moves, type_of_move) = generateMoves(
+                pm,
+                if (currentPlayer == PlayerToMove.PlayerOne) 1 else 2,
+                board,
+                positions
+            )
             var currentBestValue = Int.MIN_VALUE
             var currentBestMove: Triple<Point, Point, Map<Point, List<Point>>?>? = null
 
@@ -290,7 +307,8 @@ class Board : JComponent() {
                     val eval = -newEval.first
                     if (eval > currentBestValue) {
                         currentBestValue = eval
-                        currentBestMove = Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
+                        currentBestMove =
+                            Triple(fromPosition, toPosition, if (type_of_move == "Capture") moves else null)
                     }
 
                     if (alphaBetaEngine.timeUp) {
@@ -318,6 +336,7 @@ class Board : JComponent() {
     }
 
     fun handleMoveAI(oldPosition: Point, newPosition: Point, captureMap: Map<Point, List<Point>>? = null) {
+        if (gameEnded) return
 
         if (captureMap != null) {
             pm.capturePiece(oldPosition, newPosition)
@@ -325,28 +344,36 @@ class Board : JComponent() {
             pm.movePiece(oldPosition, newPosition)
         }
 
+        updateMoveHistory(oldPosition, newPosition, player.getPlayerToMove())
+
         // Switch player
         player.switchPlayerToMove()
         repaint()
 
-        checkForWinner()
+        gui.updateCurrentPlayerLabel(player.getPlayerToMove().name)
+        gui.getClock().switchPlayer(player.getPlayerToMove())
 
-        // If the next player is AI, call aiMove()
-        if ((getPlayerToMove() == PlayerToMove.PlayerOne && playerOne == PlayerTypes.AI_ENGINE) ||
-            (getPlayerToMove() == PlayerToMove.PlayerTwo && playerTwo == PlayerTypes.AI_ENGINE)) {
-            aiMove()
-        }
-        else if ((getPlayerToMove() == PlayerToMove.PlayerOne && playerOne == PlayerTypes.RANDOM_ENGINE) ||
-            (getPlayerToMove() == PlayerToMove.PlayerTwo && playerTwo == PlayerTypes.RANDOM_ENGINE)) {
-            aiRandomMove()
+        if (!checkForWinner()) {
+            checkAndStartAI()
         }
     }
 
     fun handleMove(oldPosition: Point, newPosition: Point): Boolean {
-        val (validMove, captureMap) = isValidMove(pm, oldPosition, newPosition, pm.piecePositions, getPlayerToMove())
+        val (validMove, captureMap) = isValidMove(
+            pm,
+            oldPosition,
+            newPosition,
+            pm.piecePositions,
+            player.getPlayerToMove()
+        )
 
         if (validMove) {
-            pm.movePiece(oldPosition, newPosition)
+            if (captureMap != null) {
+                pm.capturePiece(oldPosition, newPosition)
+            } else {
+                pm.movePiece(oldPosition, newPosition)
+            }
+
             println("Old position: $oldPosition, New position: $newPosition")
 
             captureMap?.get(oldPosition)?.let { capturedPieces ->
@@ -363,87 +390,98 @@ class Board : JComponent() {
                 println("Moved manually from $oldPosition to ${newPosition.x + dx}, ${newPosition.y} and removed piece at $capturedX, $capturedY")
             }
 
+            updateMoveHistory(oldPosition, newPosition, player.getPlayerToMove())
+
             // Switch player
             player.switchPlayerToMove()
             repaint()
 
-            checkForWinner()
-            return true
+            gui.updateCurrentPlayerLabel(player.getPlayerToMove().name)
+            gui.getClock().switchPlayer(player.getPlayerToMove())
+
+            return !checkForWinner()
         } else {
             println("Illegal move!")
             return false
         }
     }
 
-    fun checkForWinner() {
-        val winner = checkVictory(pm)
-        if (winner != null) {
-            val message: String = if (winner == PlayerToMove.PlayerOne) "White Won!" else "Black Won!"
-            JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
+    fun Point.toChessNotation(): String {
+        val columnChar = ('A' + this.y)
+        val rowNumber = 9 - this.x
+        return "$columnChar$rowNumber"
+    }
 
-            val options: Array<String> = arrayOf("Yes", "No")
-            val choice = JOptionPane.showOptionDialog(
-                this@Board,
-                "Do you want to restart the game?",
-                "Game Over",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                options,
-                options[0]
-            )
-
-            if (choice == JOptionPane.YES_OPTION) {
-                // Implement the method to reset the game
-                // restartGame()
-            } else {
-                SwingUtilities.getWindowAncestor(this@Board)?.dispatchEvent(WindowEvent(SwingUtilities.getWindowAncestor(this@Board), WindowEvent.WINDOW_CLOSING))
-            }
+    fun updateMoveHistory(from: Point, to: Point, player: PlayerToMove) {
+        val moveString = "${player.name}: ${from.toChessNotation()} -> ${to.toChessNotation()}\n"
+        val doc = gui.getMoveHistoryArea().styledDocument
+        val style = gui.getMoveHistoryArea().addStyle(null, null)
+        StyleConstants.setForeground(style, if (player == PlayerToMove.PlayerOne) Color.BLUE else Color.RED)
+        try {
+            doc.insertString(doc.length, moveString, style)
+        } catch (e: BadLocationException) {
+            e.printStackTrace()
         }
     }
 
     override fun paintComponent(g: Graphics) {
         super.paintComponent(g)
-        val currentSquareSize = minOf(width / 9, height / 9)
+        val g2d = g as Graphics2D
 
+        // Enable anti-aliasing for smoother text
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+
+        // Calculate the size of each square
+        val boardSize = minOf(width, height)
+        val squareSize = boardSize / 9
+
+        // Draw the board squares
         for (row in 0 until 9) {
             for (column in 0 until 9) {
-                val rotatedRow = column
-                val rotatedColumn = row
+                val x = column * squareSize
+                val y = row * squareSize
 
-                val x = rotatedColumn * currentSquareSize
-                val y = rotatedRow * currentSquareSize
-
+                // Draw the square
                 if ((row + column) % 2 == 0) {
-                    g.color = Color.WHITE
+                    g2d.color = Color.WHITE
                 } else {
-                    g.color = Color.LIGHT_GRAY
+                    g2d.color = Color.LIGHT_GRAY
                 }
-                g.fillRect(x, y, currentSquareSize, currentSquareSize)
+                g2d.fillRect(x, y, squareSize, squareSize)
 
-                val piece = pm.piecePositions[Point(column, row)]
+                // Draw the index in the top-left corner of the square
+                val indexLabel = "${('A' + column)}${9 - row}"
+                g2d.font = Font("Arial", Font.PLAIN, squareSize / 5)
+                g2d.color = Color.BLACK
+                val fontMetrics = g2d.fontMetrics
+                val labelX = x + squareSize / 20  // Small margin from the left edge
+                val labelY = y + fontMetrics.ascent + squareSize / 20  // Small margin from the top edge
+                g2d.drawString(indexLabel, labelX.toInt(), labelY.toInt())
+
+                // Draw the piece if present
+                val piece = pm.piecePositions[Point(row, column)]
                 if (piece != null) {
                     val image = if (piece == PlayerToMove.PlayerOne) redPawnImage else blackPawnImage
                     if (image != null) {
                         val imageWidth = image.width
                         val imageHeight = image.height
                         val scaleFactor = minOf(
-                            currentSquareSize.toDouble() / imageWidth,
-                            currentSquareSize.toDouble() / imageHeight
-                        )
+                            squareSize.toDouble() / imageWidth,
+                            squareSize.toDouble() / imageHeight
+                        ) * 0.8  // Reduce size to leave space for indices
                         val scaledWidth = (imageWidth * scaleFactor).toInt()
                         val scaledHeight = (imageHeight * scaleFactor).toInt()
-                        val xOffset = (currentSquareSize - scaledWidth) / 2
-                        val yOffset = (currentSquareSize - scaledHeight) / 2
-
-                        g.drawImage(image, x + xOffset, y + yOffset, scaledWidth, scaledHeight, null)
+                        val xOffsetImage = x + (squareSize - scaledWidth) / 2
+                        val yOffsetImage = y + (squareSize - scaledHeight) / 2 + squareSize / 10  // Adjust for index label
+                        g2d.drawImage(image, xOffsetImage, yOffsetImage, scaledWidth, scaledHeight, null)
                     } else {
-                        g.color = if (piece == PlayerToMove.PlayerOne) Color.WHITE else Color.BLACK
-                        g.fillOval(
-                            x + (currentSquareSize - Constants.PIECE_SIZE) / 2,
-                            y + (currentSquareSize - Constants.PIECE_SIZE) / 2,
-                            Constants.PIECE_SIZE,
-                            Constants.PIECE_SIZE
+                        g2d.color = if (piece == PlayerToMove.PlayerOne) Color.WHITE else Color.BLACK
+                        val pieceSize = (squareSize * 0.6).toInt()
+                        g2d.fillOval(
+                            x + (squareSize - pieceSize) / 2,
+                            y + (squareSize - pieceSize) / 2 + squareSize / 10,  // Adjust for index label
+                            pieceSize,
+                            pieceSize
                         )
                     }
                 }
@@ -452,6 +490,7 @@ class Board : JComponent() {
     }
 
     override fun getPreferredSize(): Dimension {
-        return Dimension(9 * Constants.SQUARE_SIZE, 9 * Constants.SQUARE_SIZE)
+        val size = minOf(parent.width, parent.height)
+        return Dimension(size, size)
     }
 }

@@ -39,4 +39,15 @@ class PieceManager {
     fun getBoardCopy(): Array<Array<Int>> {
         return pieceArray.map { it.copyOf() }.toTypedArray()
     }
+
+    fun reset() {
+        // Clear the piece array
+        for (row in pieceArray.indices) {
+            for (col in pieceArray[row].indices) {
+                pieceArray[row][col] = 0
+            }
+        }
+        // Clear the piece positions
+        piecePositions.clear()
+    }
 }

@@ -32,10 +32,25 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
     var timeUp = false
 
-    val adaptiveDepthIncrease: Byte = 5 // implementing nominal depth; // TODO Would it be a good idea to switch randomly between e.g. depth 9 and 10 (to weigh pessimistic - optimistic view)?
+    val adaptiveDepthIncrease: Byte = 5 // implementing nominal depth;
 
     val killerMoves = HashMap<Pair<Point, Point>, Int>()
 
+    /**
+     * Alpha-beta pruning algorithm with time constraints and adaptive search depth.
+     * Incorporates enhancements like quiescence search, move ordering (history heuristic), adaptive search depth, and killer moves.
+     *
+     * @param board The current board state.
+     * @param depth The remaining depth to search.
+     * @param alpha The alpha value for pruning.
+     * @param beta The beta value for pruning.
+     * @param player The current player.
+     * @param timeObject Object to track if time is up.
+     * @param zobrHash The Zobrist hash of the current board state.
+     * @param adaptiveFlag Flag to indicate if adaptive depth has been applied.
+     * @param currentDepth The current depth achieved in the search tree.
+     * @return A pair containing the best score and the best move found.
+     */
     fun alphaBetaWithTime(
     board: Array<Array<Int>>,
     depth: Byte,
@@ -44,11 +59,11 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
     player: PlayerToMove,  // 1 for AI, -1 for human
     timeObject: TimeKeeper,
     zobrHash: ULong = 0u,
-    adaptiveFlag: Boolean? = false // set to true when continuing search under the adaptive scheme, to not continue search until a definite win or loss is found.
+    adaptiveFlag: Boolean? = false, // set to true when continuing search under the adaptive scheme
+    currentDepth: Byte? = 0  // Added parameter to track the current depth
 ): Pair<Int, Pair<Point, Point>?> {
-        //println("executing alpha-beta")
+        // Multiplier to adjust evaluation based on player
         val playerMultiplier = if (player == PlayerToMove.PlayerOne) -1 else 1
-        val currentTime = System.currentTimeMillis()
 
         var alpha = alpha
         val oldAlpha = alpha
@@ -56,17 +71,17 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         var adaptiveFlag = adaptiveFlag
         var depth = depth
 
+        // Update max achieved depth
+        maxAchievedDepth = max(maxAchievedDepth.toInt(), currentDepth?.toInt() ?: 0).toByte()
 
-        //println("initiating tt lookup")
+        // Transposition Table Lookup
         val n = tt.getEntry(zobrHash)
-        //("finished tt lookup")
         if (n != null && n.searchDepth >= depth && n.age < alphabetacycles-n.searchDepth) {
-            //println("successfull tt lookup")
             successfullTTlookups++
             when (n.scoreType) {
                 ScoreType.EXACT -> return Pair(n.score, n.bestMove)
                 ScoreType.LOWER_BOUND -> alpha = max(alpha, n.score)
-                ScoreType.UPPER_BOUND -> beta = min(beta, n.score)  // Corrected here
+                ScoreType.UPPER_BOUND -> beta = min(beta, n.score)
             }
 
             if (alpha >= beta) {
@@ -74,11 +89,13 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             }
         }
 
+        // Check if time is up
         if (timeObject.timeUp) {
             timeUp = true
-            return Pair(0, null)  // Return a neutral value since // time is up
+            // return Pair(0, null)  // Return neutral value
         }
 
+        // Terminal node check
         if (checkTerminal(board)) {
             val winner = checkVictory(pm, board)
             return when {
@@ -87,38 +104,31 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
                 (winner == PlayerToMove.PlayerOne && playerMultiplier == -1) -> Pair(Int.MAX_VALUE, null)
                 else -> Pair(Int.MIN_VALUE + depth, null)
             }
-        } else if (depth == 0.toByte()) {
+        } else if (depth == 0.toByte() || timeUp) {
+            // Evaluate leaf node
             val evaluationResult = evaluate(board, true)
-            //println("Evaluation result received: $evaluationResult")
             var evaluationScore = playerMultiplier * evaluationResult.first
-            //println("Evaluation score calculated: $evaluationScore, Adaptive Flag: $adaptiveFlag")
 
             val contWithAdaptiveDepth = adaptiveSchemeEvaluation(evaluationScore, evaluationResult.second!!)
 
-            //print("Continue with adaptive depth? $contWithAdaptiveDepth")
-
-            // Adaptive Search Depth check:
-            if (adaptiveFlag == true || contWithAdaptiveDepth == false){
-                if (isQuiescentPosition(pm, board, player)){
-                    return Pair(evaluationScore, null)  // do not continue with increase search depth
-                }
-                else{
+            // Adaptive Search Depth check
+            if (adaptiveFlag == true || contWithAdaptiveDepth == false || timeUp){
+                if (isQuiescentPosition(pm, board, player) || timeUp){
+                    return Pair(evaluationScore, null)  // Do not continue with increased depth
+                } else {
                     depth++
                     adaptiveFlag = true
                 }
             }
             else{
-                adaptiveFlag = true  // set the flag to true as to continue the search below. Depth to nominal increased search depth (added)
+                adaptiveFlag = true  // Continue search with increased depth
                 val newDepth = (max(1, (ln(depth.toDouble()) * depth).toInt())).toByte()
 
-                // Statistics:
+                // Statistics
                 adaptiveIterations++
-                maxAdaptiveDepth = max(maxAdaptiveDepth, depth + newDepth)
-                //maxAchievedDepth = max(maxAchievedDepth, depth)
+                maxAdaptiveDepth = max(maxAdaptiveDepth.toInt(), currentDepth?.toInt()?.plus(newDepth) ?: 0)
 
                 depth = newDepth
-
-                //println("Continuing search with new depth: $depth")
             }
         }
 
@@ -131,8 +141,12 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         // Generate all possible moves
         val allMoves = successors(board, currentPlayerID).map { it.second }
 
-        // Sort moves based on History Heuristic
-        val sortedMoves = allMoves.sortedByDescending { HistoryHeuristic.getScore(it) }
+        // Sort moves based on History Heuristic and Killer Moves
+        val sortedMoves = allMoves.sortedByDescending {
+            val moveScore = HistoryHeuristic.getScore(it)
+            val killerScore = killerMoves.getOrDefault(it, 0)
+            moveScore + killerScore * 1000  // Prioritize killer moves
+        }
 
         for (move in sortedMoves) {
             val (from, to) = move
@@ -151,12 +165,12 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
                 Player.getOtherPlayer(player),
                 timeObject,
                 newHash,
-                adaptiveFlag
+                adaptiveFlag,
+                (currentDepth!! + 1).toByte()  // Increment current depth
             )
             val eval = -newEval.first
 
             if (eval > bestValue) {
-                //println("Found better value $eval")
                 bestValue = eval
                 bestFoundMove = move
             }
@@ -165,6 +179,8 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             if (alpha >= beta || timeUp) {
                 if (alpha >= beta && bestFoundMove != null) {
                     HistoryHeuristic.increment(bestFoundMove)
+                    // Incorporate killer moves
+                    killerMoves[bestFoundMove] = killerMoves.getOrDefault(bestFoundMove, 0) + 1
                 }
                 break
             }
@@ -178,7 +194,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             flag = ScoreType.LOWER_BOUND
         }
 
-        // Create a new TableEntry instance instead of reusing
+        // Store result in Transposition Table
         val entry = TableEntry().apply {
             hashValue = zobrHash
             score = bestValue
@@ -192,55 +208,30 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
         return Pair(bestValue, bestFoundMove)
 }
 
-    /**fun alphaBeta(
-    board: Array<Array<Int>>,
-    depth: Int,
-    alpha: Int,
-    beta: Int,
-    player: Int  // 1 for AI (black), -1 for human (white)
-): Int {
-    if (checkTerminal(board)) {
-        val winner = checkVictory(board)
-        return when {
-            winner == null -> 0  // Draw
-            (winner == Color.BLACK && player == 1) || (winner == Color.WHITE && player == -1) -> Int.MAX_VALUE - depth  // Current player wins
-            else -> Int.MIN_VALUE + depth  // Current player loses
-        }
-    } else if (depth == 0) {
-        return player * evaluate(board)
-    }
-
-    nodesExplored++
-    var alpha = alpha
-    var beta = beta
-    var value = Int.MIN_VALUE
-
-    val currentPlayerID = if (player == 1) 2 else 1  // AI is player ID 2 (black), human is player ID 1 (white)
-
-    for (child in successors(board, currentPlayerID)) {
-        val eval = -alphaBeta(child, depth - 1, -beta, -alpha, -player)
-        value = maxOf(value, eval)
-        alpha = maxOf(alpha, value)
-        if (alpha >= beta) {
-            break  // Alpha-beta pruning
-        }
-    }
-    return value
-}**/
-
+    /**
+     * Checks if the current board state is a terminal state (win, loss, or draw).
+     *
+     * @param board The game board.
+     * @return True if terminal state, False otherwise.
+     */
     private fun checkTerminal(board: Array<Array<Int>>): Boolean {
         return checkVictory(pm, board) != null
     }
 
+    /**
+     * Evaluates the board state and returns a score.
+     * If adaptiveThreshold is true, returns individual component values for adaptive depth decision.
+     *
+     * @param board The game board.
+     * @param adaptiveThreshold If true, returns individual evaluation components.
+     * @return Pair of evaluation score and individual components (if requested).
+     */
     private fun evaluate(board: Array<Array<Int>>, adaptiveThreshold: Boolean? = false): Pair<Int, IntArray?> {
-        //println("Evaluating")
         var score = 0
 
         var pieceDifference = 0
         var distanceToOtherSideAdvantage = 0
 
-        val pieceDifferenceWeight = 0.5
-        val distanceWeight = 0.5
         var noPiecesOpponent = (Short.MAX_VALUE).toInt()
         var noPiecesOwn = (Short.MIN_VALUE).toInt()
 
@@ -252,83 +243,81 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
                         //Piece difference
                         pieceDifference -= 1  // Each human piece is bad for AI
 
-                        /**Advancement (tried out different non-linear weighting methods to emphasize forward movement of individual pieces over 'whole army' movements and make the game faster & more exciting):**/
-                        //distanceToOtherSideAdvantage -= (8 - x) * 10  // Closer to AI's side is worse
-                        distanceToOtherSideAdvantage -= exp((9 - x).toDouble()).toInt() // using 9 instead of 8 experimentally, to punish enemy movements over own movements
-                        //distanceToOtherSideAdvantage -= (log((8 - x + 1).toDouble(),base = 2.14) * 10).toInt()
+                        // Advancement
+                        distanceToOtherSideAdvantage -= exp((9 - x).toDouble()).toInt()
                     }
                     2 -> { // AI piece (black)
                         noPiecesOwn = 0
                         //Piece difference
                         pieceDifference += 1  // Each AI piece is good for AI
 
-                        //Advancement:
-                        //distanceToOtherSideAdvantage += x * 10  // The further down the board, the better
+                        // Advancement
                         distanceToOtherSideAdvantage += exp(x.toDouble()).toInt()
-                        //distanceToOtherSideAdvantage += (log(x.toDouble() + 1,base = 2.14) * 10).toInt()
                     }
                 }
             }
         }
 
-        //println("Evaluation finished")
-
         score = 50 * pieceDifference + 10 * distanceToOtherSideAdvantage + noPiecesOwn + noPiecesOpponent
 
-        //println("Score: $score, individual weights: $pieceDifference, $distanceToOtherSideAdvantage")
-
-        /** If evaluation used to decide on continuing the search (Adaptive Scheme Framework - Adaptive Search Depth**/
         if (adaptiveThreshold == true){
             val individualValues = intArrayOf(pieceDifference, distanceToOtherSideAdvantage)
-            //println("returning evaluation, no error here")
             return Pair(score, individualValues)
         }
-        /**Else (regular evaluation & return of value) **/
-        return Pair(score, null)  // currently not in use, but who knows when it might become useful (saving memory by not creating the list in the first place)
+        return Pair(score, null)
     }
 
-    /** Method to decide whether to continue searching in an ADAPTIVE SEARCH DEPTH style, using the (most sophisticated) ADAPTIVE SCHEME from the lecture**/
+    /**
+     * Decides whether to continue searching deeper based on the evaluation score.
+     * Implements the adaptive scheme for adaptive search depth.
+     *
+     * @param score The evaluation score.
+     * @param individualValues The individual evaluation components.
+     * @return True if should deepen search, False otherwise.
+     */
     fun adaptiveSchemeEvaluation(score: Int, individualValues: IntArray): Boolean {
-        //println("Starting Adaptive evaluation")
-        // Safely cast the returned Serializable to Pair<Int, IntArray>
         val pieceD = individualValues[0]
         val forwardM = individualValues[1]
 
-        //println("Evaluating $pieceD, $forwardM")
-
-        // Define your threshold based on domain knowledge
-        // Example thresholds (adjust these based on your specific needs)
-        val pieceDifferenceThreshold = 2   // e.g., significant material advantage
-        val distanceThreshold = 20         // e.g., significant positional advantage
+        // Thresholds for significant advantage
+        val pieceDifferenceThreshold = 2   // Significant material advantage
+        val distanceThreshold = 20         // Significant positional advantage
 
         // Decide whether to continue searching deeper
         val shouldDeepen = (score > 0 && (pieceD >= pieceDifferenceThreshold) || (forwardM >= distanceThreshold))
 
-        //print("Adaptive Scheme: $shouldDeepen")
-
         return shouldDeepen
     }
 
+    /**
+     * Prints statistics for debugging and analysis.
+     */
     fun printStatistics(){
         println("Nodes explored: $nodesExplored")
-        println("Successfull TT-lookups: $successfullTTlookups of which primary: $primaries and secondary: $secondaries")
-        println("Collisions: ${Backend.collisions}")
-        println("newly Added Entries = ${Backend.newlyAddedEntries - Backend.collisions}")
+        println("Successful TT-lookups: $successfullTTlookups")
+        println("Newly Added Entries = ${Backend.newlyAddedEntries - Backend.collisions}")
         println("Adaptive Search depth - #TimesCalled: $adaptiveIterations, Maximum Search Depth achieved: $maxAdaptiveDepth")
 
+        // Reset statistics
         Backend.collisions = 0
         Backend.newlyAddedEntries = 0
         adaptiveIterations = 0
         maxAdaptiveDepth = 0
         Backend.primaries = 0
-        secondaries = 0
+        Backend.secondaries = 0
     }
 
+    /**
+     * Generates all possible successor states from the current board state.
+     *
+     * @param board The game board.
+     * @param playerID The ID of the current player.
+     * @return A list of pairs containing new board states and the moves leading to them.
+     */
     private fun successors(board: Array<Array<Int>>, playerID: Int): List<Pair<Array<Array<Int>>, Pair<Point, Point>>> {
         val positions = createPiecePositionsFromBoard(board)
         val moves = generateMoves(pm, playerID, board, positions)
         val successorsList = mutableListOf<Pair<Array<Array<Int>>, Pair<Point, Point>>>()
-        val moveList = mutableListOf<Pair<Point, Point>>()
 
         for ((fromPosition, toPositions) in moves.first) {
             for (toPosition in toPositions) {

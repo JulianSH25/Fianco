@@ -4,8 +4,16 @@ enum class PlayerToMove{
     PlayerOne, PlayerTwo
 }
 
-enum class PlayerTypes{
-    HUMAN, AI_ENGINE, RANDOM_ENGINE
+enum class PlayerTypes {
+    HUMAN,
+    AI_ENGINE,
+    RANDOM_ENGINE;
+
+    fun next(): PlayerTypes {
+        val values = PlayerTypes.values()
+        val nextOrdinal = (this.ordinal + 1) % values.size
+        return values[nextOrdinal]
+    }
 }
 
 object Player{
@@ -42,6 +50,10 @@ object Player{
 
     fun getOtherPlayer(player: PlayerToMove): PlayerToMove {
         return if(player == PlayerToMove.PlayerOne) PlayerToMove.PlayerTwo else PlayerToMove.PlayerOne
+    }
+
+    fun setPlayerToMove(move: PlayerToMove) {
+        CurrentPlayer = move
     }
 }
 
