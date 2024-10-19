@@ -228,29 +228,29 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
      * @return Pair of evaluation score and individual components (if requested).
      */
     private fun evaluate(board: Array<Array<Int>>, adaptiveThreshold: Boolean? = false): Pair<Int, IntArray?> {
-        var score = 0
+        var score = 0L
 
         var pieceDifference = 0
         var distanceToOtherSideAdvantage = 0
 
-        var noPiecesOpponent = (Short.MAX_VALUE).toInt()
-        var noPiecesOwn = (Short.MIN_VALUE).toInt()
+        var noPiecesOpponent = (Short.MAX_VALUE).toLong()
+        var noPiecesOwn = (Short.MIN_VALUE).toLong()
 
         for (x in board.indices) {
             for (y in board[x].indices) {
                 when (board[x][y]) {
-                    1 -> { // Human piece (white)
+                1 -> { // PlayerOne piece (white)
                         noPiecesOpponent = 0
-                        //Piece difference
-                        pieceDifference -= 1  // Each human piece is bad for AI
+                            //Piece difference
+                        pieceDifference -= 1  // Each PlayerOne piece is bad for PlayerTwo
 
                         // Advancement
                         distanceToOtherSideAdvantage -= exp((9 - x).toDouble()).toInt()
                     }
-                    2 -> { // AI piece (black)
+                2 -> { // PlayerTwo piece (black)
                         noPiecesOwn = 0
                         //Piece difference
-                        pieceDifference += 1  // Each AI piece is good for AI
+                        pieceDifference += 1  // Each PlayerTwo piece is good for PlayerTwo
 
                         // Advancement
                         distanceToOtherSideAdvantage += exp(x.toDouble()).toInt()
@@ -259,13 +259,17 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
             }
         }
 
-        score = 50 * pieceDifference + 10 * distanceToOtherSideAdvantage + noPiecesOwn + noPiecesOpponent
+        // Perform calculations using Long to prevent overflow
+        score = (50L * pieceDifference) + (10L * distanceToOtherSideAdvantage) + noPiecesOwn + noPiecesOpponent
 
-        if (adaptiveThreshold == true){
-            val individualValues = intArrayOf(pieceDifference, distanceToOtherSideAdvantage)
-            return Pair(score, individualValues)
-        }
-        return Pair(score, null)
+        // Clamp the score to Int range
+        val finalScore: Int = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+
+            if (adaptiveThreshold == true){
+                val individualValues = intArrayOf(pieceDifference, distanceToOtherSideAdvantage)
+            return Pair(finalScore, individualValues)
+            }
+        return Pair(finalScore, null)
     }
 
     /**
