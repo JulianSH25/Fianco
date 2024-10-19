@@ -1,8 +1,9 @@
 import kotlin.concurrent.thread
 
 /**
- * TimeKeeper class manages a countdown timer running on a separate thread.
- * It sets the [timeUp] flag to true when the specified time limit is reached.
+ * Manages a countdown timer running on a separate thread.
+ *
+ * Sets the [timeUp] flag to true when the specified time limit is reached.
  *
  * @property timeLimitMillis The time limit in milliseconds.
  */
@@ -16,7 +17,6 @@ class TimeKeeper(private val timeLimitMillis: Short) {
         private set
 
     // Internal thread that manages the countdown
-    // Initialize and start the timer thread
     private val timerThread: Thread = thread(start = true, isDaemon = true, name = "TimeKeeperThread") {
         try {
             // Sleep for the specified time limit

@@ -76,7 +76,7 @@ class AlphaBetaEngine(pieceManager: PieceManager) {
 
         // Transposition Table Lookup
         val n = tt.getEntry(zobrHash)
-        if (n != null && n.searchDepth >= depth && n.age < alphabetacycles-n.searchDepth) {
+        if (n != null && n.searchDepth >= depth) { //&& n.age < alphabetacycles-n.searchDepth) {
             successfullTTlookups++
             when (n.scoreType) {
                 ScoreType.EXACT -> return Pair(n.score, n.bestMove)
