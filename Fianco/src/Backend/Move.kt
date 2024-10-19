@@ -2,15 +2,14 @@ package Backend
 
 import java.awt.Point
 
-/**fun printPositionMap(positionMap: Map<Point, List<Point>>) {
-    for ((position, moves) in positionMap) {
-        println("Piece at position $position can move to the following positions:")
-        for (move in moves) {
-            println("  - $move")
-        }
-    }
-}**/
-
+/**
+ * Makes a move on the board, updating the board state.
+ *
+ * @param board The game board represented as a 2D array.
+ * @param from The starting position of the piece.
+ * @param to The destination position of the piece.
+ * @param isCapture Indicates whether the move is a capture move.
+ */
 fun makeMove(
     board: Array<Array<Int>>,
     from: Point,
