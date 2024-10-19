@@ -2,14 +2,31 @@ package Backend
 
 import java.awt.Point
 
+/**
+ * Manages the game pieces and board state.
+ *
+ * Provides methods to get, set, move, and capture pieces on the board.
+ */
 class PieceManager {
     private val pieceArray: Array<Array<Int>> = Array(9) { Array(9) { 0 } }
     val piecePositions = mutableMapOf<Point, PlayerToMove>()
 
-    // Get a piece at a specific row and column
+    /**
+     * Gets the piece at a specific row and column.
+     *
+     * @param row The row index.
+     * @param column The column index.
+     * @return The piece value (0 for empty, 1 for PlayerOne, 2 for PlayerTwo).
+     */
     fun getPiece(row: Int, column: Int): Int = pieceArray[row][column]
 
-    // Set a piece at a specific row and column
+    /**
+     * Sets the piece at a specific row and column.
+     *
+     * @param row The row index.
+     * @param column The column index.
+     * @param value The piece value to set (0 for empty, 1 for PlayerOne, 2 for PlayerTwo).
+     */
     fun setPiece(row: Int, column: Int, value: Int) {
         pieceArray[row][column] = value
         val point = Point(row, column)
@@ -20,11 +37,23 @@ class PieceManager {
         }
     }
 
+    /**
+     * Moves a piece from one position to another.
+     *
+     * @param oldPosition The starting position of the piece.
+     * @param newPosition The destination position of the piece.
+     */
     fun movePiece(oldPosition: Point, newPosition: Point) {
         setPiece(newPosition.x, newPosition.y, getPiece(oldPosition.x, oldPosition.y))
         setPiece(oldPosition.x, oldPosition.y, 0)
     }
 
+    /**
+     * Captures a piece by moving to the new position and removing the captured piece.
+     *
+     * @param oldPosition The starting position of the piece.
+     * @param newPosition The destination position of the piece.
+     */
     fun capturePiece(oldPosition: Point, newPosition: Point) {
         setPiece(newPosition.x, newPosition.y, getPiece(oldPosition.x, oldPosition.y))
         setPiece(oldPosition.x, oldPosition.y, 0)
@@ -35,11 +64,18 @@ class PieceManager {
         setPiece(oldPosition.x + dx, oldPosition.y + dy, 0)
     }
 
-    // Get a copy of the current board
+    /**
+     * Gets a copy of the current board state.
+     *
+     * @return A 2D array representing the board.
+     */
     fun getBoardCopy(): Array<Array<Int>> {
         return pieceArray.map { it.copyOf() }.toTypedArray()
     }
 
+    /**
+     * Resets the board to an empty state.
+     */
     fun reset() {
         // Clear the piece array
         for (row in pieceArray.indices) {
