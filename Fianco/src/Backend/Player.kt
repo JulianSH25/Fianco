@@ -5,7 +5,7 @@ enum class PlayerToMove{
 }
 
 enum class PlayerTypes{
-    HUMAN, AI_ENGINE
+    HUMAN, AI_ENGINE, RANDOM_ENGINE
 }
 
 object Player{

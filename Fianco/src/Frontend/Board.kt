@@ -20,6 +20,7 @@ import Backend.PlayerTypes
 import Backend.Player.setPlayers
 import Backend.Player.getPlayerToMove
 import Backend.PlayerToMove
+import Backend.RandomEngine
 import Backend.Zobrist
 import TimeKeeper
 import Backend.Player as player
@@ -33,7 +34,7 @@ class Board : JComponent() {
     private var initialiseAI = true
 
     // Set both players to AI_ENGINE for AI vs AI games
-    private val playerOne = PlayerTypes.AI_ENGINE
+    private val playerOne = PlayerTypes.RANDOM_ENGINE
     private val playerTwo = PlayerTypes.AI_ENGINE
 
     private var selectedPiece: Point? = null
@@ -61,8 +62,13 @@ class Board : JComponent() {
         initializeBoard()
 
         // If the current player is AI, start the AI move
-        if (getPlayerToMove() == PlayerToMove.PlayerOne && playerOne == PlayerTypes.AI_ENGINE) {
-            aiMove()
+        if (getPlayerToMove() == PlayerToMove.PlayerOne) {
+            if (playerOne == PlayerTypes.AI_ENGINE){
+                aiMove()
+            }
+            else if (playerOne == PlayerTypes.RANDOM_ENGINE){
+                aiRandomMove()
+            }
         }
 
         // Ensure only one argument is passed to addMouseListener
@@ -94,6 +100,10 @@ class Board : JComponent() {
                             (getPlayerToMove() == PlayerToMove.PlayerTwo && playerTwo == PlayerTypes.AI_ENGINE)) {
                             aiMove()
                         }
+                        else if ((getPlayerToMove() == PlayerToMove.PlayerOne && playerOne == PlayerTypes.RANDOM_ENGINE) ||
+                            (getPlayerToMove() == PlayerToMove.PlayerTwo && playerTwo == PlayerTypes.RANDOM_ENGINE)) {
+                            aiRandomMove()
+                        }
                     } else {
                         selectedPiece = null
                     }
@@ -106,6 +116,37 @@ class Board : JComponent() {
                 repaint()
             }
         })
+    }
+
+    fun aiRandomMove() {
+        println("AI MOVE - picking random move!")
+        val aiWorker = object : SwingWorker<Void, Void>() {
+            override fun doInBackground(): Void? {
+                val boardCopy = pm.getBoardCopy()
+                val positionsCopy = createPiecePositionsFromBoard(boardCopy)
+                val currentPlayerID = if (getPlayerToMove() == PlayerToMove.PlayerOne) 1 else 2
+                val (moves, typeOfMove) = generateMoves(pm, currentPlayerID, boardCopy, positionsCopy)
+                if (moves.isNotEmpty()) {
+                    val randomEngine = RandomEngine()
+                    val (fromPosition, toPosition) = randomEngine.pickRandomMove(moves)
+                    SwingUtilities.invokeLater {
+                        handleMoveAI(fromPosition, toPosition, if (typeOfMove == "Capture") moves else null)
+                        repaint()
+                        checkForWinner()
+                    }
+                } else {
+                    println("AI has no valid moves!")
+                }
+                return null
+            }
+
+            override fun done() {
+                SwingUtilities.invokeLater {
+                    infoLabel.text = "Random AI made a move."
+                }
+            }
+        }
+        aiWorker.execute()
     }
 
     fun aiMove() {
@@ -294,6 +335,10 @@ class Board : JComponent() {
         if ((getPlayerToMove() == PlayerToMove.PlayerOne && playerOne == PlayerTypes.AI_ENGINE) ||
             (getPlayerToMove() == PlayerToMove.PlayerTwo && playerTwo == PlayerTypes.AI_ENGINE)) {
             aiMove()
+        }
+        else if ((getPlayerToMove() == PlayerToMove.PlayerOne && playerOne == PlayerTypes.RANDOM_ENGINE) ||
+            (getPlayerToMove() == PlayerToMove.PlayerTwo && playerTwo == PlayerTypes.RANDOM_ENGINE)) {
+            aiRandomMove()
         }
     }
 
