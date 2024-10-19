@@ -6,15 +6,23 @@ import javax.swing.border.LineBorder
 import Backend.PlayerTypes
 import java.io.OutputStream
 import java.io.PrintStream
+import javax.swing.text.BadLocationException
+import javax.swing.text.StyleConstants
 
+/**
+ * The main GUI class for the Fianco game.
+ *
+ * Sets up the game window, components, and handles user interactions.
+ */
 class FiancoGUI : JFrame() {
 
+    // Labels and components for the GUI
     private val gameNameLabel = JLabel("FIANCO")
     private val playerOneClockLabel = JLabel("05:00")
     private val playerTwoClockLabel = JLabel("05:00")
     private val currentPlayerLabel = JLabel("Current Player: PlayerOne")
     private val board = Board(this)
-    private val clock = Clock(playerOneClockLabel, playerTwoClockLabel, board)
+    private val clock = Clock(playerTwoClockLabel, playerOneClockLabel, board)
     private var playerOne = PlayerTypes.HUMAN
     private var playerTwo = PlayerTypes.AI_ENGINE
 
@@ -58,9 +66,9 @@ class FiancoGUI : JFrame() {
     private val clocksPane = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         preferredSize = Dimension(100, 0) // Adjust as needed
-        add(playerTwoClockLabel)
-        add(Box.createVerticalGlue()) // Pushes the next component to the bottom
         add(playerOneClockLabel)
+        add(Box.createVerticalGlue()) // Pushes the next component to the bottom
+        add(playerTwoClockLabel)
     }
 
     // Right pane containing clocks and output area
@@ -71,6 +79,7 @@ class FiancoGUI : JFrame() {
         // The outputScrollPane will be added dynamically to the CENTER
     }
 
+    // Control buttons and checkbox
     private val playerOneTypeButton = JButton("Player One: ${playerOne.name}")
     private val playerTwoTypeButton = JButton("Player Two: ${playerTwo.name}")
     private val startButton = JButton("Start Game")
@@ -80,13 +89,14 @@ class FiancoGUI : JFrame() {
     private var standardOut: PrintStream? = null
 
     init {
+        // Set the look and feel for consistency
         UIManager.put("Serif", Font("Georgia", Font.PLAIN, 12))
 
         title = "Fianco Game"
         defaultCloseOperation = EXIT_ON_CLOSE
         layout = BorderLayout()
 
-
+        // Set up the game name and current player labels
         gameNameLabel.font = Font("Arial", Font.BOLD, 24)
         val namePanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -95,16 +105,17 @@ class FiancoGUI : JFrame() {
         }
         add(namePanel, BorderLayout.NORTH)
 
+        // Set up the game board
         board.border = LineBorder(Color.BLACK)
 
         val mainPanel = JPanel(BorderLayout())
         mainPanel.add(board, BorderLayout.CENTER)
         add(mainPanel, BorderLayout.CENTER)
 
-        // Add the left pane
+        // Add the left pane (move history)
         add(leftPane, BorderLayout.WEST)
 
-        // Add the right pane
+        // Add the right pane (clocks and output area)
         add(rightPane, BorderLayout.EAST)
 
         // Control Panel for Buttons
@@ -112,7 +123,7 @@ class FiancoGUI : JFrame() {
         controlPanel.add(playerOneTypeButton)
         controlPanel.add(playerTwoTypeButton)
         controlPanel.add(startButton)
-        controlPanel.add(displayStatsCheckbox) // Add the checkbox here
+        controlPanel.add(displayStatsCheckbox)
         add(controlPanel, BorderLayout.SOUTH)
 
         // Action Listeners for Buttons
@@ -132,7 +143,7 @@ class FiancoGUI : JFrame() {
             startGame()
         }
 
-        // Action Listener for the checkbox
+        // Action Listener for the checkbox to display or hide statistics
         displayStatsCheckbox.addActionListener {
             if (displayStatsCheckbox.isSelected) {
                 redirectConsoleOutput()
@@ -162,6 +173,9 @@ class FiancoGUI : JFrame() {
         isVisible = true
     }
 
+    /**
+     * Redirects the console output to the output area in the GUI.
+     */
     private fun redirectConsoleOutput() {
         // Save the standard output stream
         if (standardOut == null) {
@@ -181,6 +195,9 @@ class FiancoGUI : JFrame() {
         System.setOut(printStream)
     }
 
+    /**
+     * Starts the game by initializing the board, setting players, and starting the clock.
+     */
     fun startGame() {
         board.initializeBoard()
         board.setPlayers(playerOne, playerTwo)
@@ -190,20 +207,37 @@ class FiancoGUI : JFrame() {
         board.checkAndStartAI()
     }
 
+    /**
+     * Updates the label displaying the current player's turn.
+     *
+     * @param playerName The name of the current player.
+     */
     fun updateCurrentPlayerLabel(playerName: String) {
         currentPlayerLabel.text = "Current Player: $playerName"
     }
 
+    /**
+     * Provides access to the move history text pane.
+     *
+     * @return The JTextPane displaying the move history.
+     */
     fun getMoveHistoryArea(): JTextPane {
         return moveHistoryArea
     }
 
+    /**
+     * Provides access to the game clock.
+     *
+     * @return The Clock instance managing the game timers.
+     */
     fun getClock(): Clock {
         return clock
     }
 }
 
-// Add the main function to run the application
+/**
+ * Main function to run the Fianco game application.
+ */
 fun main() {
     SwingUtilities.invokeLater { FiancoGUI() }
 }

@@ -32,6 +32,8 @@ class Board(private val gui: FiancoGUI) : JComponent() {
     private val pm = PieceManager()
     private val zb = Zobrist()
 
+    private var returnedWinner = false
+
     private var selectedPiece: Point? = null
 
     // Images for the pawns
@@ -99,7 +101,10 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         val winner = checkVictory(pm)
         if (winner != null) {
             val message: String = if (winner == PlayerToMove.PlayerOne) "White Won!" else "Black Won!"
-            JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
+            if (!returnedWinner) {
+                JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
+                returnedWinner = true
+            }
             endGame()
             return true
         }
@@ -109,8 +114,10 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         val currentPlayerPieces = pm.piecePositions.filterValues { it == currentPlayer }
         if (currentPlayerPieces.isEmpty()) {
             val message = "Player ${if (currentPlayer == PlayerToMove.PlayerOne) "White" else "Black"} has no pieces left! They lose."
-            JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
-            endGame()
+            if (!returnedWinner) {
+                JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
+                returnedWinner = true
+            }
             return true
         }
 
@@ -125,8 +132,10 @@ class Board(private val gui: FiancoGUI) : JComponent() {
         }
         if (moves.isEmpty()) {
             val message = "Player ${if (currentPlayer == PlayerToMove.PlayerOne) "White" else "Black"} cannot make a move! They lose."
-            JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
-            endGame()
+            if (!returnedWinner) {
+                JOptionPane.showMessageDialog(this@Board, message, "Game Over", JOptionPane.INFORMATION_MESSAGE)
+                returnedWinner = true
+            }
             return true
         }
 
@@ -168,6 +177,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
      */
     fun initializeBoard() {
         gameEnded = false
+        returnedWinner = false
         pm.reset()
         Player.setPlayerToMove(PlayerToMove.PlayerOne)
 
@@ -237,7 +247,7 @@ class Board(private val gui: FiancoGUI) : JComponent() {
                 val (moves, typeOfMove) = generateMoves(pm, currentPlayerID, boardCopy, positionsCopy)
                 if (moves.isNotEmpty()) {
                     val randomEngine = RandomEngine()
-                    val (fromPosition, toPosition) = randomEngine.pickRandomMove(moves)
+                    val (fromPosition, toPosition) = randomEngine.pickRandomMove(moves, pm, Player.getPlayerToMove())
                     SwingUtilities.invokeLater {
                         handleMoveAI(fromPosition, toPosition, if (typeOfMove == "Capture") moves else null)
                         checkForWinner()

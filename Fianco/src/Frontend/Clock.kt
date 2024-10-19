@@ -15,7 +15,7 @@ class Clock(
     private var playerOneSeconds = Constants.INITIAL_TIME_SECONDS
     private var playerTwoSeconds = Constants.INITIAL_TIME_SECONDS
     private var currentPlayer: PlayerToMove = PlayerToMove.PlayerOne
-    private val timer = Timer(1000, null)
+    private val timer = Timer(1000, null) // Timer ticks every 1000 milliseconds (1 second)
     private val running = AtomicBoolean(false)
 
     init {
@@ -40,28 +40,48 @@ class Clock(
         }
     }
 
+    /**
+     * Updates the clock label with the formatted time.
+     *
+     * @param label The JLabel to update.
+     * @param seconds The number of seconds remaining.
+     */
     fun updateLabel(label: JLabel, seconds: Int) {
         val minutes = seconds / 60
         val secs = seconds % 60
         label.text = String.format("%02d:%02d", minutes, secs)
     }
 
+    /**
+     * Starts the timer if it's not already running.
+     */
     fun start() {
         if (running.compareAndSet(false, true)) {
             timer.start()
         }
     }
 
+    /**
+     * Stops the timer if it's running.
+     */
     fun stop() {
         if (running.compareAndSet(true, false)) {
             timer.stop()
         }
     }
 
+    /**
+     * Switches the current player whose clock is ticking.
+     *
+     * @param player The player to switch to.
+     */
     fun switchPlayer(player: PlayerToMove) {
         currentPlayer = player
     }
 
+    /**
+     * Resets both players' clocks to the initial time.
+     */
     fun reset() {
         stop()
         playerOneSeconds = Constants.INITIAL_TIME_SECONDS
